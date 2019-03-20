@@ -1,0 +1,103 @@
+type UID = enumeration of 0, 1, 2
+type Status = enumeration of unknown, chosen, reported
+
+
+automaton Sys(u0: UID, u1: UID, u2: UID)
+    where u0 ≠ u1 ∧ u1 ≠ u2 ∧ u2 ≠ u0
+
+components
+    P0: AsyncLCR_0(u0)
+    P1: AsyncLCR_1(u1)
+    P2: AsyncLCR_2(u2)
+
+invariant of Sys:
+   (u0 ≠ max(u0, u1, u2) => P0.status = unknown)
+ ∧ (u1 ≠ max(u0, u1, u2) => P1.status = unknown)
+ ∧ (u2 ≠ max(u0, u1, u2) => P2.status = unknown)
+    
+
+automaton AsyncLCR_0(u0: UID)
+
+signature
+    output from0to1(v: UID)
+    input  from2to0(v: UID)
+    output leader_0
+
+states
+    q: Seq[UID] := [u0]
+    status: Status := unknown
+
+transitions
+    output from0to1(v)
+       pre q ≠ [] ∧ v = head(q)
+       eff q := tail(q)
+
+    input  from2to0(v)
+       eff if v > u0 then
+               q := append(q, v)
+           else if v = u0 then
+               status := chosen
+           else
+               // do nothing
+
+    output leader_0
+       pre status = chosen
+       eff status := reported
+
+
+automaton AsyncLCR_1(u1: UID)
+
+signature
+    output from1to2(v: UID)
+    input  from0to1(v: UID)
+    output leader_1
+
+states
+    q: Seq[UID] := [u1]
+    status: Status := unknown
+
+transitions
+    output from1to2(v)
+       pre q ≠ [] ∧ v = head(q)
+       eff q := tail(q)
+
+    input  from0to1(v)
+       eff if v > u1 then
+               q := append(q, v)
+           else if v = u1 then
+               status := chosen
+           else
+               // do nothing
+
+    output leader_1
+       pre status = chosen
+       eff status := reported
+
+
+automaton AsyncLCR_2(u2: UID)
+
+signature
+    output from2to0(v: UID)
+    input  from1to2(v: UID)
+    output leader_2
+
+states
+    q: Seq[UID] := [u2]
+    status: Status := unknown
+
+transitions
+    output from2to0(v)
+       pre q ≠ [] ∧ v = head(q)
+       eff q := tail(q)
+
+    input  from1to2(v)
+       eff if v > u2 then
+               q := append(q, v)
+           else if v = u2 then
+               status := chosen
+           else
+               // do nothing
+
+    output leader_2
+       pre status = chosen
+       eff status := reported
