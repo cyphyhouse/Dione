@@ -1,7 +1,7 @@
 UID = IntEnum(0, 1, 2)
 Status = Enum(UNKNOWN, CHOSEN, REPORTED)
 
-@Composition
+@composition
 class Sys:
     def parameters(u0: UID, u1: UID, u2: UID):
         where = (u0 != u1 and u1 != u2 and u2 != u0)
@@ -17,16 +17,16 @@ class Sys:
             implies(u2 != max(u0, u1, u2), P2.status == Status.UNKNOWN)
     )
 
-@Automaton
+@automaton
 class AsyncLCR0:
     def parameters(u0: UID): pass
 
     class signature:
-        @Output
+        @output
         def from0to1(v: UID): where = True
-        @Input
+        @input
         def from2to0(v: UID): pass
-        @Output
+        @output
         def leader_0(): pass
 
     def states(
@@ -35,32 +35,32 @@ class AsyncLCR0:
     ): initially = True
 
     class transitions:
-        @Output
-        @Pre(q != [] and v == q[0])
-        def from0to1(v):
+
+        @output
+        @pre(q != [] and v == q[0])
+        def eff_from0to1(v):
             q = q[1:]
 
-        @Input
+        @input
         def from2to0(v):
             if v > u0:
                 q = q + [v]
             elif v == u0:
                 status = Status.CHOSEN
 
-        @Output
-        @Pre(status == Status.CHOSEN)
+        @output
+        @pre(status == Status.CHOSEN)
         def leader_0():
             status = Status.REPORTED
 
-    invariant = True
 
 
-@Automaton
+@automaton
 class AsyncLCR1:
     pass
 
 
-@Automaton
+@automaton
 class AsyncLCR2:
     pass
 
