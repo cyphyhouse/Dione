@@ -1,19 +1,32 @@
 from enum import Enum, auto
 
+class AutoName(Enum):
+    def _generate_next_value_(self, start, count, last_values):
+        return self
 
-class IOA(Enum):
+class IOA(AutoName):
+
+    def __str__(self):
+        return str(self.value)
+
     AUTOMATON_DEF = auto()
-    AUTOMATON = "automaton"
-    COMPONENTS = "components"
+    PRIM_AUTOMATON = "automaton"
+    COMPONENT = auto()
+    COMPONENT_LIST = "components"
     COMPOSITION = "composition"
     EFFECT = "eff"
+    FORMAL_ACT = auto()
     INVARIANT = "invariant"
-    MODULE = "module"
+    IOA_SPEC = auto()
     PARAMETERS = "parameters"
     PRECONDITION = "pre"
     SIGNATURE = "signature"
     SIMULATION = "simulation"
-    TRANSITIONS = "transitions"
+    STATEMENT = "statement"
+    STATES = "states"
+    TRAJECTORIES = "trajectories"
+    TRANSITION_LIST = "transitions"
+    TRANSITION = auto()
     TYPE_DEF = auto()
     WHERE = "where"
 
@@ -22,20 +35,20 @@ class IOAScope:
     """ Keep track of current scope using a stack while comparable with IOA
         value """
     def __init__(self):
-        self.__stack = [IOA.MODULE]
+        self.__stack = [IOA.IOA_SPEC]
 
     def __eq__(self, other: IOA) -> bool:
         assert self.__stack
-        return self.__stack[-1] == IOA
+        return self.__stack[-1] == other
 
     @property
     def value(self):
         assert self.__stack
         return self.__stack[-1].value
 
-    def enter(self, ioa_struct):
+    def enter(self, ioa_construct):
         # TODO check if the scope always goes to lower level
-        self.__stack.append(ioa_struct)
+        self.__stack.append(ioa_construct)
 
     def exit(self):
         self.__stack.pop()
@@ -43,9 +56,9 @@ class IOAScope:
 
 class IOAScopeHandler:
     """ Make sure the scope is correctly set and reset via `with` statement"""
-    def __init__(self, scope, ioa_struct):
+    def __init__(self, scope, ioa_construct):
         self.__scope = scope
-        self.__ioa = ioa_struct
+        self.__ioa = ioa_construct
 
     def __enter__(self):
         self.__scope.enter(self.__ioa)

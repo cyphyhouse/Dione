@@ -52,16 +52,3 @@ class AsyncLCR0:
         @pre(status == Status.CHOSEN)
         def leader_0():
             status = Status.REPORTED
-
-
-
-@automaton
-class AsyncLCR1:
-    pass
-
-
-@automaton
-class AsyncLCR2:
-    pass
-
-
