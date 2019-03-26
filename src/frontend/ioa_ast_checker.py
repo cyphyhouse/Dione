@@ -20,13 +20,13 @@ class IOAAstChecker(ast.NodeVisitor):
         if self.__scope == IOA.IOA_SPEC:
             return self.visit_TypeDef(node)
         if self.__scope == IOA.PRIM_AUTOMATON or \
-            self.__scope == IOA.COMPOSITION:
+                self.__scope == IOA.COMPOSITION:
             if isinstance(node.targets[0], ast.Name):
                 lhs = self.visit(node.targets[0])
                 if IOA(lhs) == IOA.INVARIANT:
                     return self.visit_Invariant(lhs, node.value)
         if self.__scope == IOA.PARAMETERS or \
-            self.__scope == IOA.FORMAL_ACT:
+                self.__scope == IOA.FORMAL_ACT:
             if isinstance(node.targets[0], ast.Name):
                 lhs = self.visit(node.targets[0])
                 if IOA(lhs) == IOA.WHERE:
@@ -37,11 +37,17 @@ class IOAAstChecker(ast.NodeVisitor):
             return self.visit_AssignInEff(node)
         # else:
         raise ValueError("Unexpected assignment when specifying " +
-            self.__scope.value)
+                         self.__scope.value)
 
     def visit_ClassDef(self, class_def):
         if self.__scope == IOA.IOA_SPEC:
-            return self.visit_AutomatonDef(class_def)
+            deco_list = [self.visit(d) for d in class_def.decorator_list]
+            # If both @composition and @automaton are present,
+            # try composition first
+            if str(IOA.COMPOSITION) in deco_list:
+                return self.visit_Composition(class_def)
+            if str(IOA.PRIM_AUTOMATON) in deco_list:
+                return self.visit_PrimitiveAutomaton(class_def)
         if self.__scope == IOA.PRIM_AUTOMATON:
             if IOA(class_def.name) == IOA.SIGNATURE:
                 return self.visit_Signature(class_def)
@@ -51,7 +57,7 @@ class IOAAstChecker(ast.NodeVisitor):
                 return self.visit_Trajectories(class_def)
         # else:
         raise ValueError("Unexpected class \"" + class_def.name +
-             "\" when specifying " + self.__scope.value)
+                         "\" when specifying " + self.__scope.value)
 
     def visit_FunctionDef(self, func_def):
         if self.__scope == IOA.IOA_SPEC:
@@ -73,7 +79,7 @@ class IOAAstChecker(ast.NodeVisitor):
             return self.visit_Transition(func_def)
         # else:
         raise ValueError("Unexpected function \"" + func_def.name +
-            "\" when specifying " + self.__scope.value)
+                         "\" when specifying " + self.__scope.value)
 
     def visit_Module(self, mod):
         return self.visit_IOASpec(mod)
@@ -81,69 +87,61 @@ class IOAAstChecker(ast.NodeVisitor):
     def visit_Name(self, node):
         return node.id
 
+    def visit_Pass(self, stmt_pass):
+        # TODO Do we have to differentiate pass statements appearing under different constructs
+        return IOA.STMT_PASS
+
+    # Util functions
+    def __visit_list(self, ls, scope, eq_one=None, geq_one=None,
+                     leq_one=None, optional=None):
+        # Avoid mutable default arguments
+        if eq_one is None:
+            eq_one = []
+        if geq_one is None:
+            geq_one = []
+        if leq_one is None:
+            leq_one = []
+        if optional is None:
+            optional = []
+
+        with IOAScopeHandler(self.__scope, scope):
+            for stmt in ls:
+                ioa_construct = self.visit(stmt)
+                if not isinstance(ioa_construct, IOA):
+                    raise ValueError("Unexpected Python \"" + str(stmt) +
+                                     "\" when specifying " + self.__scope.value)
+                if ioa_construct not in (eq_one + geq_one + leq_one + optional):
+                    raise ValueError("Unexpected \"" + str(ioa_construct) +
+                                     "\" when specifying " + self.__scope.value)
+        # TODO check if the body contains exactly one of each construct in eq_one
+        # TODO check if the body contains at least one of each construct in geq_one
+        # TODO check if the body contains at most one of each construct in leq_one
+
     # IOA specific language constructs
     def visit_IOASpec(self, spec):
-        expected = [IOA.AUTOMATON_DEF, IOA.SIMULATION, IOA.TYPE_DEF]
-
-        for stmt in spec.body:
-            ioa_construct = self.visit(stmt)
-            if ioa_construct not in expected:
-                # FIXME more precise error message
-                raise ValueError(
-                    "Unexpected \"" + str(ioa_construct) + "\" at " +
-                        self.__scope.value + " level")
+        optional = [IOA.PRIM_AUTOMATON, IOA.COMPOSITION, IOA.SIMULATION,
+                    IOA.TYPE_DEF]
+        self.__visit_list(spec.body, IOA.IOA_SPEC,
+                          optional=optional)
         return IOA.IOA_SPEC
 
-    def visit_AutomatonDef(self, node):
-        deco_list = [self.visit(d) for d in node.decorator_list]
-        # If both @compostion and @automaton are present,
-        # try composition first
-        if str(IOA.COMPOSITION) in deco_list and \
-                self.visit_Composition(node):
-            return IOA.AUTOMATON_DEF
-        if str(IOA.PRIM_AUTOMATON) in deco_list and \
-                self.visit_PrimitiveAutomaton(node):
-            return IOA.AUTOMATON_DEF
-        # else:
-        raise ValueError("Wrong decorators " + str(deco_list))
-
-    def visit_PrimitiveAutomaton(self, node):
-        expected = [IOA.PARAMETERS, IOA.SIGNATURE, IOA.STATES,
-            IOA.TRANSITION_LIST, IOA.TRAJECTORIES, IOA.INVARIANT]
-
-        with IOAScopeHandler(self.__scope, IOA.PRIM_AUTOMATON):
-            for stmt in node.body:
-                ioa_construct = self.visit(stmt)
-                if not isinstance(ioa_construct, IOA):
-                     # FIXME more precise error message
-                    raise ValueError("Unexpected Python \"" + str(stmt) +
-                        "\" when specifying " + self.__scope.value)
-                if ioa_construct not in expected:
-                    # FIXME more precise error message
-                    raise ValueError("Unexpected \"" + str(ioa_construct) +
-                        "\" when specifying " + self.__scope.value)
-        # TODO check if the body contains exactly one of each construct
+    def visit_PrimitiveAutomaton(self, class_def):
+        self.__visit_list(class_def.body, IOA.PRIM_AUTOMATON,
+                          eq_one=[IOA.SIGNATURE, IOA.STATES, IOA.TRANSITION_LIST],
+                          leq_one=[IOA.PARAMETERS, IOA.TRAJECTORIES],
+                          optional=[IOA.INVARIANT])
         return IOA.PRIM_AUTOMATON
 
-    def visit_Composition(self, node):
-        expected = [IOA.PARAMETERS, IOA.COMPONENT_LIST, IOA.INVARIANT]
-
-        with IOAScopeHandler(self.__scope, IOA.COMPOSITION):
-            for stmt in node.body:
-                ioa_construct = self.visit(stmt)
-                if not isinstance(ioa_construct, IOA):
-                    # FIXME more precise error message
-                    raise ValueError("Unexpected Python \"" + str(stmt) +
-                        "\" when specifying " + self.__scope.value)
-                if ioa_construct not in expected:
-                    # FIXME more precise error message
-                    raise ValueError("Unexpected \"" + str(ioa_construct) +
-                        "\" when specifying " + self.__scope.value)
-        # TODO check if the body contains exactly one of each construct
+    def visit_Composition(self, class_def):
+        self.__visit_list(class_def.body, IOA.COMPOSITION,
+                          eq_one=[IOA.COMPONENT_LIST],
+                          leq_one=[IOA.PARAMETERS],
+                          optional=[IOA.INVARIANT])
         return IOA.COMPOSITION
 
-    def visit_ComponentList(self, node):
-        # TODO
+    def visit_ComponentList(self, func_def):
+        self.__visit_list(func_def.body, IOA.COMPONENT_LIST,
+                          geq_one=[IOA.COMPONENT])
         return IOA.COMPONENT_LIST
 
     def visit_Component(self, stmt):
@@ -162,12 +160,15 @@ class IOAAstChecker(ast.NodeVisitor):
             pass
         return IOA.INVARIANT
 
-    def visit_Parameters(self, node):
-        # TODO
+    def visit_Parameters(self, func_def):
+        self.__visit_list(func_def.body, IOA.PARAMETERS,
+                          leq_one=[IOA.WHERE],
+                          optional=[IOA.STMT_PASS])
         return IOA.PARAMETERS
 
-    def visit_Signature(self, node):
-        # TODO
+    def visit_Signature(self, class_def):
+        self.__visit_list(class_def.body, IOA.SIGNATURE,
+                          geq_one=[IOA.FORMAL_ACT])
         return IOA.SIGNATURE
 
     def visit_Simulation(self, node):
@@ -182,8 +183,9 @@ class IOAAstChecker(ast.NodeVisitor):
         # TODO
         return IOA.TRAJECTORIES
 
-    def visit_TransitionList(self, node):
-        # TODO
+    def visit_TransitionList(self, class_def):
+        self.__visit_list(class_def.body, IOA.TRANSITION_LIST,
+                          geq_one=[IOA.TRANSITION])
         return IOA.TRANSITION_LIST
 
     def visit_Transition(self, node):
@@ -202,7 +204,7 @@ class IOAAstChecker(ast.NodeVisitor):
         return IOA.TYPE_DEF
 
     def visit_Where(self, lhs_str, rhs_node):
-        assert IOA(lhs_str) == IOA.WHERE
+        assert lhs_str == str(IOA.WHERE)
         # TODO Check where clause is bool
         return IOA.WHERE
 

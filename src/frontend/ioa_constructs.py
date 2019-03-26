@@ -9,7 +9,6 @@ class IOA(AutoName):
     def __str__(self):
         return str(self.value)
 
-    AUTOMATON_DEF = auto()
     PRIM_AUTOMATON = "automaton"
     COMPONENT = auto()
     COMPONENT_LIST = "components"
@@ -24,6 +23,7 @@ class IOA(AutoName):
     SIMULATION = "simulation"
     STATEMENT = "statement"
     STATES = "states"
+    STMT_PASS = auto()
     TRAJECTORIES = "trajectories"
     TRANSITION_LIST = "transitions"
     TRANSITION = auto()
@@ -35,7 +35,7 @@ class IOAScope:
     """ Keep track of current scope using a stack while comparable with IOA
         value """
     def __init__(self):
-        self.__stack = [IOA.IOA_SPEC]
+        self.__stack = []
 
     def __eq__(self, other: IOA) -> bool:
         assert self.__stack
