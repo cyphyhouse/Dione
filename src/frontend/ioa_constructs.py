@@ -1,34 +1,56 @@
 from enum import Enum, auto
 
+
 class AutoName(Enum):
     def _generate_next_value_(self, start, count, last_values):
-        return self
+        assert isinstance(self, str)
+        return self.lower()
+
 
 class IOA(AutoName):
 
     def __str__(self):
         return str(self.value)
 
-    PRIM_AUTOMATON = "automaton"
-    COMPONENT = auto()
-    COMPONENT_LIST = "components"
-    COMPOSITION = "composition"
-    EFFECT = "eff"
-    FORMAL_ACT = auto()
-    INVARIANT = "invariant"
-    IOA_SPEC = auto()
-    PARAMETERS = "parameters"
-    PRECONDITION = "pre"
-    SIGNATURE = "signature"
-    SIMULATION = "simulation"
-    STATEMENT = "statement"
-    STATES = "states"
-    STMT_PASS = auto()
-    TRAJECTORIES = "trajectories"
-    TRANSITION_LIST = "transitions"
-    TRANSITION = auto()
-    TYPE_DEF = auto()
-    WHERE = "where"
+    @classmethod
+    def get(cls, key, default):
+        try:
+            return cls[key.upper()]
+        except KeyError:
+            return default
+
+    # reserved words
+    AUTOMATON = auto()
+    COMPONENTS = auto()
+    COMPOSITION = auto()
+    EFF = auto()
+    ELSE = auto()
+    FOR = auto()
+    HIDDEN = auto()
+    IF = auto()
+    INITIALLY = auto()
+    INPUT = auto()
+    INTERNAL = auto()
+    INVARIANT = auto()
+    OUTPUT = auto()
+    PASS = auto()
+    PRE = auto()
+    SIGNATURE = auto()
+    SIMULATION = auto()
+    STATES = auto()
+    TRAJECTORIES = auto()
+    TRANSITIONS = auto()
+    WHERE = auto()
+    # internal syntax constructs
+    ASSIGN = "$assign"
+    DECL_COMPONENT = "$decl_component"
+    DECL_VAR = "$decl_decl_var"
+    FORMAL_ACT = "$formal_act"
+    IDENTIFIER = "$identifier"
+    IOA_SPEC = "$ioa_spec"
+    SHORTHAND = "$shorthand"
+    TRANSITION = "$transition"
+    TYPE_DEF = "$type_def"
 
 
 class IOAScope:
