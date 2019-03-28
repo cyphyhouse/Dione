@@ -8,7 +8,6 @@ class AutoName(Enum):
 
 
 class IOA(AutoName):
-
     def __str__(self):
         return str(self.value)
 
@@ -42,6 +41,7 @@ class IOA(AutoName):
     TRANSITIONS = auto()
     WHERE = auto()
     # internal syntax constructs
+    AUTOMATON_INSTANCE = "$automaton_instance"
     ASSIGN = "$assign"
     DECL_COMPONENT = "$decl_component"
     DECL_VAR = "$decl_decl_var"

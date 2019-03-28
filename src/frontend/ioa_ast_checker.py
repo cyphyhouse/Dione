@@ -75,7 +75,7 @@ class IOAAstChecker(ast.NodeVisitor):
         if self.__scope == IOA.EFF:
             raise NotImplementedError("Function call is not supported in eff yet")
         if self.__scope == IOA.DECL_COMPONENT:
-            return
+            return self.visit_AutomatonInstance(call)
 
         # else:
         if isinstance(call.func, ast.Name):
@@ -131,6 +131,14 @@ class IOAAstChecker(ast.NodeVisitor):
         raise ValueError("Unexpected function \"" + func_def.name +
                          "\" when specifying " + self.__scope.value)
 
+    def visit_For(self, stmt):
+        # TODO
+        return IOA.FOR
+
+    def visit_If(self, stmt):
+        # TODO
+        return IOA.IF
+
     def visit_Module(self, mod):
         return self.visit_IOASpec(mod)
 
@@ -146,17 +154,10 @@ class IOAAstChecker(ast.NodeVisitor):
         return IOA.PASS
 
     def visit_arguments(self, arguments):
-        if arguments.vararg or arguments.kwonlyargs or \
-                arguments.kw_defaults or arguments.kwarg or \
-                arguments.defaults:
-            # TODO more precise error message
-            raise ValueError("Unexpected arguments")
-        return [self.visit(arg) for arg in arguments.args]
+        raise AssertionError("Should be unreachable")
 
     def visit_arg(self, arg):
-        # TODO also return type hint
-        type_hint = self.visit(arg.annotation)
-        return arg.arg
+        raise AssertionError("Should be unreachable")
 
     # Util functions
     def visit_decorator(self, deco):
@@ -173,7 +174,21 @@ class IOAAstChecker(ast.NodeVisitor):
         raise ValueError("Unexpected decorator \"" + str(val) +
                          "\" when specifying " + self.__scope.value)
 
-    def __check_list(self, ls, eq_one=None, geq_one=None,
+    def __get_arguments(self, arguments):
+        if arguments.vararg or arguments.kwonlyargs or \
+                arguments.kw_defaults or arguments.kwarg or \
+                arguments.defaults:
+            # TODO more precise error message
+            raise ValueError("Unexpected arguments")
+        return [self.__get_arg(arg) for arg in arguments.args]
+
+    def __get_arg(self, arg):
+        # TODO also return type hint
+        if arg.annotation:
+            type_hint = self.visit(arg.annotation)
+        return arg.arg
+
+    def __check_list(self, ioa_iter, eq_one=None, geq_one=None,
                      leq_one=None, one_of=None, optional=None):
         # Avoid mutable default arguments
         if eq_one is None:
@@ -187,7 +202,7 @@ class IOAAstChecker(ast.NodeVisitor):
         if optional is None:
             optional = []
 
-        for ioa_construct in ls:
+        for ioa_construct in ioa_iter:
             if not isinstance(ioa_construct, IOA):
                 raise ValueError("Unexpected return value \"" + str(ioa_construct) +
                                  "\" when specifying " + self.__scope.value)
@@ -204,19 +219,24 @@ class IOAAstChecker(ast.NodeVisitor):
         assert isinstance(spec, ast.Module)
 
         with IOAScopeHandler(self.__scope, IOA.IOA_SPEC):
-            ioa_list = map(self.visit, spec.body)
-            self.__check_list(ioa_list,
+            ioa_iter = map(self.visit, spec.body)
+            self.__check_list(ioa_iter,
                               optional=[IOA.AUTOMATON, IOA.COMPOSITION,
                                         IOA.SIMULATION, IOA.TYPE_DEF])
         return IOA.IOA_SPEC
+
+    def visit_AutomatonInstance(self, aut_inst):
+        assert isinstance(aut_inst, ast.Call)
+        # TODO
+        return IOA.AUTOMATON_INSTANCE
 
     def visit_PrimitiveAutomaton(self, prim):
         assert isinstance(prim, ast.FunctionDef)
 
         with IOAScopeHandler(self.__scope, IOA.AUTOMATON):
-            parameters = self.visit(prim.args)
-            ioa_list = map(self.visit, prim.body)
-            self.__check_list(ioa_list,
+            parameters = self.__get_arguments(prim.args)
+            ioa_iter = map(self.visit, prim.body)
+            self.__check_list(ioa_iter,
                               eq_one=[IOA.SIGNATURE, IOA.STATES,
                                       IOA.TRANSITIONS],
                               leq_one=[IOA.WHERE, IOA.INITIALLY, IOA.TRAJECTORIES],
@@ -227,9 +247,9 @@ class IOAAstChecker(ast.NodeVisitor):
         assert isinstance(comp, ast.FunctionDef)
 
         with IOAScopeHandler(self.__scope, IOA.COMPOSITION):
-            parameters = self.visit(comp.args)
-            ioa_list = map(self.visit, comp.body)
-            self.__check_list(ioa_list,
+            parameters = self.__get_arguments(comp.args)
+            ioa_iter = map(self.visit, comp.body)
+            self.__check_list(ioa_iter,
                               eq_one=[IOA.COMPONENTS],
                               leq_one=[IOA.WHERE],
                               optional=[IOA.INVARIANT])
@@ -239,8 +259,8 @@ class IOAAstChecker(ast.NodeVisitor):
         assert isinstance(comp_list, ast.ClassDef)
 
         with IOAScopeHandler(self.__scope, IOA.COMPONENTS):
-            ioa_list = map(self.visit, comp_list.body)
-            self.__check_list(ioa_list,
+            ioa_iter = map(self.visit, comp_list.body)
+            self.__check_list(ioa_iter,
                               geq_one=[IOA.DECL_COMPONENT],
                               leq_one=[IOA.HIDDEN])
         return IOA.COMPONENTS
@@ -249,10 +269,13 @@ class IOAAstChecker(ast.NodeVisitor):
         assert lhs == IOA.IDENTIFIER
         assert isinstance(typ, ast.expr)
         assert rhs is None
-        # TODO
-        with IOAScopeHandler(self.__scope, IOA.DECL_COMPONENT):
-            self.visit(typ)
 
+        with IOAScopeHandler(self.__scope, IOA.DECL_COMPONENT):
+            ioa_construct = self.visit(typ)
+            if ioa_construct != IOA.AUTOMATON_INSTANCE:
+                raise ValueError("Unexpected \"" + str(ioa_construct) +
+                                 "\" when specifying " + self.__scope.value)
+            # TODO
         return IOA.DECL_COMPONENT
 
     def visit_DeclStateVar(self, lhs, typ, rhs):
@@ -270,9 +293,9 @@ class IOAAstChecker(ast.NodeVisitor):
         assert isinstance(act, ast.FunctionDef)
 
         with IOAScopeHandler(self.__scope, IOA.FORMAL_ACT):
-            parameters = self.visit(act.args)
-            ioa_list = map(self.visit, act.body)
-            self.__check_list(ioa_list,
+            parameters = self.__get_arguments(act.args)
+            ioa_iter = map(self.visit, act.body)
+            self.__check_list(ioa_iter,
                               leq_one=[IOA.WHERE],
                               optional=[IOA.PASS])
         # TODO
@@ -309,8 +332,8 @@ class IOAAstChecker(ast.NodeVisitor):
     def visit_Signature(self, sig):
         assert isinstance(sig, ast.ClassDef)
         with IOAScopeHandler(self.__scope, IOA.SIGNATURE):
-            ioa_list = map(self.visit, sig.body)
-            self.__check_list(ioa_list,
+            ioa_iter = map(self.visit, sig.body)
+            self.__check_list(ioa_iter,
                               geq_one=[IOA.FORMAL_ACT])
         return IOA.SIGNATURE
 
@@ -331,22 +354,24 @@ class IOAAstChecker(ast.NodeVisitor):
     def visit_TransitionList(self, tran_list):
         assert isinstance(tran_list, ast.ClassDef)
         with IOAScopeHandler(self.__scope, IOA.TRANSITIONS):
-            ioa_list = map(self.visit, tran_list.body)
-            self.__check_list(ioa_list,
+            ioa_iter = map(self.visit, tran_list.body)
+            self.__check_list(ioa_iter,
                               geq_one=[IOA.TRANSITION])
         return IOA.TRANSITIONS
 
     def visit_Transition(self, tran):
         assert isinstance(tran, ast.FunctionDef)
         with IOAScopeHandler(self.__scope, IOA.TRANSITION):
-            ioa_list = map(self.visit_decorator, tran.decorator_list)
-            self.__check_list(ioa_list,
+            ioa_iter = map(self.visit_decorator, tran.decorator_list)
+            self.__check_list(ioa_iter,
+                              leq_one=[IOA.PRE],
                               one_of=[IOA.INPUT, IOA.OUTPUT, IOA.INTERNAL])
-            parameters = self.visit(tran.args)
-            ioa_list = map(self.visit, tran.body)
-            self.__check_list(ioa_list,
-                              optional=[IOA.ASSIGN, IOA.IF,
-                                        IOA.FOR, IOA.PASS])
+            parameters = self.__get_arguments(tran.args)
+            with IOAScopeHandler(self.__scope, IOA.EFF):
+                ioa_iter = map(self.visit, tran.body)
+                self.__check_list(ioa_iter,
+                                  optional=[IOA.ASSIGN, IOA.IF,
+                                            IOA.FOR, IOA.PASS])
         # TODO
         return IOA.TRANSITION
 
@@ -367,7 +392,7 @@ class IOAAstChecker(ast.NodeVisitor):
         return IOA.WHERE
 
     def visit_StmtAssign(self, lhs, rhs):
-        assert isinstance(lhs, str)
+        assert lhs == IOA.IDENTIFIER
         assert isinstance(rhs, ast.expr)
         with IOAScopeHandler(self.__scope, IOA.ASSIGN):
             # TODO
