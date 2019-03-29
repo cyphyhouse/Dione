@@ -189,10 +189,9 @@ class IOAAstVisitor(ast.NodeVisitor):
         raise AssertionError("Should be unreachable")  # FIXME error message
 
     def visit_list(self, ls):
-        if self.__scope == IOA.AUTOMATON or self.__scope == IOA.COMPOSITION or \
-                self.__scope == IOA.FORMAL_ACT:
-            with IOAScopeHandler(self.__scope, IOA.FORMAL_PARA_LIST):
-                return self.visit_FormalParameters(ls)
+        # FIXME It may be really confusing, but only the body of eff, a list of stmts,
+        #  is handled by this function. Other lists currently have to be handled
+        #  explicitly when implementing each visit function.
         if self.__scope == IOA.TRANSITION:
             assert all(isinstance(s, ast.stmt) for s in ls)
             with IOAScopeHandler(self.__scope, IOA.EFF):
