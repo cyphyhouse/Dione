@@ -154,10 +154,6 @@ class IOAAstChecker(IOAAstVisitor):
         # TODO
         return IOA.ACTUAL_PARA
 
-    def visit_If(self, stmt):
-        # TODO
-        return IOA.IF
-
     def visit_Initially(self, cond):
         assert isinstance(cond, ast.expr)
         # TODO Check initial condition is bool
@@ -167,10 +163,6 @@ class IOAAstChecker(IOAAstVisitor):
         assert isinstance(cond, ast.expr)
         # TODO Check invariant is bool
         return IOA.INVARIANT
-
-    def visit_Pass(self, stmt):
-        # TODO Do we have to differentiate pass statements appearing under different constructs
-        return IOA.PASS
 
     def visit_Precondition(self, cond):
         assert isinstance(cond, ast.expr)
@@ -244,3 +236,19 @@ class IOAAstChecker(IOAAstVisitor):
         # TODO Check types of lhs and rhs are consistent
         self.visit(rhs)
         return IOA.ASSIGN
+
+    def visit_StmtIf(self, stmt):
+        # TODO
+        return IOA.IF
+
+    def visit_StmtPass(self, stmt):
+        # TODO Do we have to differentiate pass statements appearing under different constructs
+        return IOA.PASS
+
+    def visit_Identifier(self, name: str):
+        # TODO
+        return IOA.IDENTIFIER
+
+    def visit_Shorthand(self, typ):
+        # TODO
+        return IOA.SHORTHAND

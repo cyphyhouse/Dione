@@ -2,11 +2,19 @@
     Automata in a given Python AST
 """
 
+import abc
 import ast
+from typing import List, Optional
+
 from src.frontend.ioa_constructs import IOA, IOAScope, IOAScopeHandler
 
 
-class IOAAstVisitor(ast.NodeVisitor):
+# TODO Decide in each visit function whether we give user AST root node itself
+#  OR only the necessary subtrees that are used for IOA.
+#  For example, visit_Signature only need the body and doesn't need
+#  decorator_list and others
+
+class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     def __init__(self):
         self.__scope = IOAScope()
 
@@ -122,6 +130,9 @@ class IOAAstVisitor(ast.NodeVisitor):
         raise ValueError("Unexpected class \"" + class_def.name +
                          "\" when specifying " + self.__scope.value)
 
+    def visit_For(self, stmt):
+        return self.visit_For(stmt)
+
     def visit_FunctionDef(self, func_def):
         if not func_def.decorator_list:
             raise ValueError("A decorator is expected for function \"" +
@@ -156,6 +167,9 @@ class IOAAstVisitor(ast.NodeVisitor):
         raise ValueError("Unexpected function \"" + func_def.name +
                          "\" when specifying " + self.__scope.value)
 
+    def visit_If(self, stmt):
+        return self.visit_StmtIf(stmt)
+
     def visit_Module(self, mod):
         with IOAScopeHandler(self.__scope, IOA.IOA_SPEC):
             return self.visit_IOASpec(mod)
@@ -168,6 +182,9 @@ class IOAAstVisitor(ast.NodeVisitor):
             return self.visit_ActionType(name.id)
         # else:
         raise ValueError("Reserved word \"" + name.id + "\" is used as an identifier")
+
+    def visit_Pass(self, stmt):
+        return self.visit_StmtPass(stmt)
 
     def visit_arguments(self, arguments):
         if arguments.vararg or arguments.kwonlyargs or \
@@ -201,40 +218,42 @@ class IOAAstVisitor(ast.NodeVisitor):
                          " when specifying " + self.__scope.value)
 
     # IOA specific language constructs
-    def visit_IOASpec(self, spec):
+    def visit_IOASpec(self, spec: ast.Module):
         pass
 
-    def visit_PrimitiveAutomaton(self, prim):
+    def visit_PrimitiveAutomaton(self, prim: ast.FunctionDef):
         pass
 
-    def visit_AutomatonInstance(self, aut_inst):
+    def visit_AutomatonInstance(self, aut_inst: ast.Call):
         pass
 
-    def visit_Composition(self, comp):
+    def visit_Composition(self, comp: ast.FunctionDef):
         pass
 
-    def visit_ComponentList(self, comp_list):
+    def visit_ComponentList(self, comp_list: ast.ClassDef):
         pass
 
-    def visit_DeclStateVar(self, lhs, typ, rhs):
+    def visit_DeclStateVar(self, lhs: ast.expr, typ: ast.expr,
+                           rhs: Optional[ast.expr]):
         pass
 
-    def visit_DeclComponent(self, lhs, typ, rhs):
+    def visit_DeclComponent(self, lhs: ast.expr, typ: ast.expr,
+                            rhs: Optional[ast.expr]):
         pass
 
-    def visit_Effect(self, stmt_list):
+    def visit_Effect(self, stmt_list: List[ast.stmt]):
         pass
 
-    def visit_ActionType(self, act_typ):
+    def visit_ActionType(self, act_typ: str):
         pass
 
-    def visit_FormalAction(self, act):
+    def visit_FormalAction(self, act: ast.FunctionDef):
         pass
 
-    def visit_FormalParameters(self, para_list):
+    def visit_FormalParameters(self, para_list: List[ast.arg]):
         pass
 
-    def visit_FormalPara(self, para):
+    def visit_FormalPara(self, para: ast.arg):
         pass
 
     def visit_ActualParameters(self, para_list):
@@ -246,56 +265,56 @@ class IOAAstVisitor(ast.NodeVisitor):
     def visit_Hidden(self, node):
         raise NotImplementedError("Hidden actions are not supported yet")
 
-    def visit_Identifier(self, name):
+    def visit_Identifier(self, name: str):
         pass
 
-    def visit_Signature(self, sig):
+    def visit_Signature(self, sig: ast.ClassDef):
         pass
 
     def visit_Simulation(self, node):
         raise NotImplementedError("Simulations are not supported yet.")
 
-    def visit_States(self, states):
+    def visit_States(self, states: ast.ClassDef):
         pass
 
     def visit_Trajectories(self, node):
-        raise NotImplementedError("Trajectories are not supported now.")
+        raise NotImplementedError("Trajectories are not supported yet.")
 
-    def visit_TransitionList(self, tran_list):
+    def visit_TransitionList(self, tran_list: ast.ClassDef):
         pass
 
-    def visit_Transition(self, tran):
+    def visit_Transition(self, tran: ast.FunctionDef):
         pass
 
-    def visit_TypeDef(self, lhs, rhs):
+    def visit_TypeDef(self, lhs: ast.expr, rhs: ast.expr):
         pass
 
-    def visit_Initially(self, cond):
+    def visit_Initially(self, cond: ast.expr):
         pass
 
-    def visit_Invariant(self, cond):
+    def visit_Invariant(self, cond: ast.expr):
         pass
 
-    def visit_Precondition(self, cond):
+    def visit_Precondition(self, cond: ast.expr):
         pass
 
-    def visit_Where(self, cond):
+    def visit_Where(self, cond: ast.expr):
         pass
 
-    def visit_StmtAssign(self, lhs, rhs):
+    def visit_StmtAssign(self, lhs: ast.expr, rhs: ast.expr):
         pass
 
-    def visit_For(self, stmt):
+    def visit_StmtFor(self, stmt: ast.For):
         raise NotImplementedError("For-loops are not supported now.")
 
-    def visit_If(self, stmt):
+    def visit_StmtIf(self, stmt: ast.If):
         pass
 
-    def visit_Pass(self, stmt):
+    def visit_StmtPass(self, stmt: ast.Pass):
         pass
 
     def visit_Shorthand(self, typ):
         """ Shorthand is to build new types via enumeration, tuple, or union.
             See IOA manual Section 23
         """
-        pass
+        raise NotImplementedError("Shorthand types are not supported yet.")
