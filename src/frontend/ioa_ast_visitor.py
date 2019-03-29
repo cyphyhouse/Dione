@@ -14,14 +14,6 @@ class IOAAstVisitor(ast.NodeVisitor):
     def _get_scope(self):
         return self.__scope
 
-    @staticmethod
-    def _get_decorator_name(deco):
-        if isinstance(deco, ast.Name):
-            return deco.id
-        if isinstance(deco, ast.Call) and isinstance(deco.func, ast.Name):
-            return deco.func.id
-        raise ValueError("Unexpect expression as a decorator")
-
     # Python language constructs
     def visit_AnnAssign(self, node):
         """ Variable annotated with type hints and followed by an optional assigned value. """
@@ -140,7 +132,8 @@ class IOAAstVisitor(ast.NodeVisitor):
             if len(func_def.decorator_list) > 1:
                 raise ValueError("Only one decorator is expected for \"" +
                                  func_def.name + "\"")
-            deco = self._get_decorator_name(func_def.decorator_list[0])
+            assert isinstance(func_def.decorator_list[0], ast.Name)
+            deco = func_def.decorator_list[0].id
             if deco == str(IOA.COMPOSITION):
                 with IOAScopeHandler(self.__scope, IOA.COMPOSITION):
                     return self.visit_Composition(func_def)
@@ -170,7 +163,9 @@ class IOAAstVisitor(ast.NodeVisitor):
     def visit_Name(self, name):
         # Check if name is a not reserved word
         if not IOA.get(name.id, None):
-            return self.visit_Identifier(name)
+            return self.visit_Identifier(name.id)
+        if self.__scope == IOA.TRANSITION:
+            return self.visit_ActionType(name.id)
         # else:
         raise ValueError("Reserved word \"" + name.id + "\" is used as an identifier")
 
@@ -229,6 +224,9 @@ class IOAAstVisitor(ast.NodeVisitor):
         pass
 
     def visit_Effect(self, stmt_list):
+        pass
+
+    def visit_ActionType(self, act_typ):
         pass
 
     def visit_FormalAction(self, act):

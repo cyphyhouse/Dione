@@ -4,7 +4,7 @@
 
 import ast
 
-from src.frontend.ioa_constructs import IOA, IOAScope, IOAScopeHandler
+from src.frontend.ioa_constructs import IOA
 from src.frontend.ioa_ast_visitor import IOAAstVisitor
 
 
@@ -200,8 +200,7 @@ class IOAAstChecker(IOAAstVisitor):
 
     def visit_Transition(self, tran):
         assert isinstance(tran, ast.FunctionDef)
-        ioa_iter = map(lambda d: IOA.get(self._get_decorator_name(d), None),
-                       tran.decorator_list)
+        ioa_iter = map(self.visit, tran.decorator_list)
         self.__check_list(ioa_iter,
                           leq_one=[IOA.PRE],
                           one_of=[IOA.INPUT, IOA.OUTPUT, IOA.INTERNAL])
@@ -212,6 +211,17 @@ class IOAAstChecker(IOAAstVisitor):
             raise ValueError("Unexpected \"" + str(effect) +
                              "\" when specifying " + self._get_scope().value)
         return IOA.TRANSITION
+
+    def visit_ActionType(self, act_typ):
+        assert isinstance(act_typ, str)
+        if act_typ == str(IOA.INPUT):
+            return IOA.INPUT
+        if act_typ == str(IOA.INTERNAL):
+            return IOA.INTERNAL
+        if act_typ == str(IOA.OUTPUT):
+            return IOA.OUTPUT
+        # else:
+        raise ValueError("Unexpected action type \"" + act_typ + "\"")
 
     def visit_TypeDef(self, lhs, rhs):
         assert isinstance(lhs, ast.Name)
