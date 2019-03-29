@@ -1,5 +1,5 @@
-UID = IntEnum(0, 1, 2)
-Status = Enum(UNKNOWN, CHOSEN, REPORTED)
+UID: type = IntEnum(0, 1, 2)
+Status: type = Enum(UNKNOWN, CHOSEN, REPORTED)
 
 @composition
 def Sys(u0: UID, u1: UID, u2: UID):

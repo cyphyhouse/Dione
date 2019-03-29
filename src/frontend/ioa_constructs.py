@@ -39,6 +39,7 @@ class IOA(AutoName):
     STATES = auto()
     TRAJECTORIES = auto()
     TRANSITIONS = auto()
+    TYPE = auto()
     WHERE = auto()
     # internal syntax constructs
     AUTOMATON_INSTANCE = "$automaton_instance"

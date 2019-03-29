@@ -29,6 +29,11 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             # TODO Allow subscription expressions (e.g., sequence, map, etc.) or member access
             raise NotImplementedError("Left-hand side must be an identifier for now.")
 
+        if self.__scope == IOA.IOA_SPEC:
+            if isinstance(node.annotation, ast.Name) and node.annotation.id == str(IOA.TYPE):
+                assert node.value
+                with IOAScopeHandler(self.__scope, IOA.TYPE_DEF):
+                    return self.visit_TypeDef(node.target, node.value)
         if self.__scope == IOA.STATES:
             with IOAScopeHandler(self.__scope, IOA.DECL_VAR):
                 return self.visit_DeclStateVar(node.target, node.annotation, node.value)
@@ -50,9 +55,6 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             raise NotImplementedError("Left-hand side must be an identifier for now.")
 
         lhs_str = node.targets[0].id
-        if self.__scope == IOA.IOA_SPEC:
-            with IOAScopeHandler(self.__scope, IOA.TYPE_DEF):
-                return self.visit_TypeDef(node.targets[0], node.value)
         if self.__scope == IOA.AUTOMATON:
             if lhs_str == str(IOA.INITIALLY):
                 with IOAScopeHandler(self.__scope, IOA.INITIALLY):
