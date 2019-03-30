@@ -49,7 +49,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         assert node.targets
         if len(node.targets) > 1:
             # TODO allow multiple assignment?
-            raise NotImplementedError("Multiple assignment is currently not supported.")
+            raise NotImplementedError("Multiple assignment is not supported yet.")
         if not isinstance(node.targets[0], ast.Name):
             # TODO Allow subscription expressions (e.g., sequence, map, etc.) or member access
             raise NotImplementedError("Left-hand side must be an identifier for now.")
@@ -94,11 +94,15 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
                 assert call.args and len(call.args) == 1
                 with IOAScopeHandler(self.__scope, IOA.PRE):
                     return self.visit_Precondition(call.args[0])
-        if self.__scope == IOA.EFF:
-            raise NotImplementedError("Function call is not supported in eff yet")
         if self.__scope == IOA.DECL_COMPONENT:
             with IOAScopeHandler(self.__scope, IOA.AUTOMATON_INSTANCE):
                 return self.visit_AutomatonInstance(call)
+        if self.__scope == IOA.EFF or \
+                self.__scope == IOA.PRE or \
+                self.__scope == IOA.INITIALLY or \
+                self.__scope == IOA.INVARIANT or \
+                self.__scope == IOA.WHERE:
+            return self.visit_ExternalCall(call)
         # else:
         if isinstance(call.func, ast.Name):
             func = call.func.id
@@ -133,7 +137,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
                          "\" when specifying " + self.__scope.value)
 
     def visit_For(self, stmt):
-        return self.visit_For(stmt)
+        return self.visit_StmtFor(stmt)
 
     def visit_FunctionDef(self, func_def):
         if not func_def.decorator_list:
@@ -187,6 +191,10 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
 
     def visit_Pass(self, stmt):
         return self.visit_StmtPass(stmt)
+
+    def visit_Subscript(self, expr):
+        # TODO Differentiate between types and values
+        pass
 
     def visit_arguments(self, arguments):
         if arguments.vararg or arguments.kwonlyargs or \
@@ -320,3 +328,6 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             See IOA manual Section 23
         """
         raise NotImplementedError("Shorthand types are not supported yet.")
+
+    def visit_ExternalCall(self, call: ast.Call):
+        pass
