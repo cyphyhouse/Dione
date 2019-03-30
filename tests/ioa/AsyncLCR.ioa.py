@@ -11,9 +11,9 @@ def Sys(u0: UID, u1: UID, u2: UID):
         P2: AsyncLCR2(u2)
 
     invariant = (
-            implies(u0 != max(u0, u1, u2), P0.status == Status.UNKNOWN) and
-            implies(u1 != max(u0, u1, u2), P1.status == Status.UNKNOWN) and
-            implies(u2 != max(u0, u1, u2), P2.status == Status.UNKNOWN)
+            implies(u0 != max(u0, u1, u2), P0.status == UNKNOWN) and
+            implies(u1 != max(u0, u1, u2), P1.status == UNKNOWN) and
+            implies(u2 != max(u0, u1, u2), P2.status == UNKNOWN)
     )
 
 @automaton
@@ -28,9 +28,9 @@ def AsyncLCR0(u0: UID):
         def leader_0(): pass
 
     class states:
-        q: Seq[UID] = [u0]
+        q: Seq[UID]
         status: Status
-    initially = status == Status.UNKNOWN
+    initially = q == [u0] and status == UNKNOWN
 
     class transitions:
         @output
@@ -43,9 +43,9 @@ def AsyncLCR0(u0: UID):
             if v > u0:
                 q = q + [v]
             elif v == u0:
-                status = Status.CHOSEN
+                status = CHOSEN
 
         @output
-        @pre(status == Status.CHOSEN)
+        @pre(status == CHOSEN)
         def leader_0():
-            status = Status.REPORTED
+            status = REPORTED
