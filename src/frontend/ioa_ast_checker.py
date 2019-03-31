@@ -205,15 +205,9 @@ class IOAAstChecker(IOAAstVisitor):
         return IOA.TRANSITION
 
     def visit_ActionType(self, act_typ):
-        assert isinstance(act_typ, str)
-        if act_typ == str(IOA.INPUT):
-            return IOA.INPUT
-        if act_typ == str(IOA.INTERNAL):
-            return IOA.INTERNAL
-        if act_typ == str(IOA.OUTPUT):
-            return IOA.OUTPUT
-        # else:
-        raise ValueError("Unexpected action type \"" + act_typ + "\"")
+        assert isinstance(act_typ, IOA)
+        assert act_typ in [IOA.INPUT, IOA.INTERNAL, IOA.OUTPUT]
+        return act_typ
 
     def visit_TypeDef(self, lhs, rhs):
         assert isinstance(lhs, ast.Name)

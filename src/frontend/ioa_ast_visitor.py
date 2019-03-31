@@ -181,13 +181,16 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             return self.visit_IOASpec(mod)
 
     def visit_Name(self, name):
+        construct = IOA.get(name.id, None)
         # Check if name is a not reserved word
-        if not IOA.get(name.id, None):
+        if not construct:
             return self.visit_Identifier(name.id)
         # name.id is a reserved word
         if self.__scope == IOA.FORMAL_ACT or \
                 self.__scope == IOA.TRANSITION:
-            return self.visit_ActionType(name.id)
+            if construct in [IOA.INPUT, IOA.INTERNAL, IOA.OUTPUT]:
+                return self.visit_ActionType(construct)
+            raise ValueError("Unexpected action type \"" + name.id + "\"")
         # else:
         raise ValueError("Reserved word \"" + name.id + "\" is used as an identifier")
 
@@ -218,10 +221,12 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         raise AssertionError("Should be unreachable")  # FIXME error message
 
     def visit_list(self, ls):
-        # FIXME It may be really confusing, but only the body of eff, a list of stmts,
-        #  is handled by this function. Other lists currently have to be handled
+        # FIXME It may be really confusing, but only the body of eff or a block,
+        #  that is, a list of stmts, is handled by this function.
+        #  Other lists currently have to be handled
         #  explicitly when implementing each visit function.
-        if self.__scope == IOA.TRANSITION:
+        if self.__scope == IOA.TRANSITION or \
+                self.__scope == IOA.EFF:
             assert all(isinstance(s, ast.stmt) for s in ls)
             with IOAScopeHandler(self.__scope, IOA.EFF):
                 return self.visit_Effect(ls)
