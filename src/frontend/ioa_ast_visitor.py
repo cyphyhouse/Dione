@@ -59,15 +59,15 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             if lhs_str == str(IOA.INITIALLY):
                 with IOAScopeHandler(self.__scope, IOA.INITIALLY):
                     return self.visit_Initially(node.value)
-            if lhs_str == str(IOA.INVARIANT):
-                with IOAScopeHandler(self.__scope, IOA.INVARIANT):
+            if lhs_str == str(IOA.INVARIANT_OF):
+                with IOAScopeHandler(self.__scope, IOA.INVARIANT_OF):
                     return self.visit_Invariant(node.value)
             if lhs_str == str(IOA.WHERE):
                 with IOAScopeHandler(self.__scope, IOA.WHERE):
                     return self.visit_Where(node.value)
         if self.__scope == IOA.COMPOSITION:
-            if lhs_str == str(IOA.INVARIANT):
-                with IOAScopeHandler(self.__scope, IOA.INVARIANT):
+            if lhs_str == str(IOA.INVARIANT_OF):
+                with IOAScopeHandler(self.__scope, IOA.INVARIANT_OF):
                     return self.visit_Invariant(node.value)
             if lhs_str == str(IOA.WHERE):
                 with IOAScopeHandler(self.__scope, IOA.WHERE):
@@ -80,9 +80,9 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             return self.visit_StmtAssign(node.targets[0], node.value)
         # else:
         if self.__scope == IOA.STATES:
-            raise ValueError("Type of \"" + lhs_str.value +
+            raise ValueError("Type of \"" + lhs_str +
                              "\" is required for specifying " + self.__scope.value)
-        raise ValueError("Unexpected assignment to \"" + lhs_str.value +
+        raise ValueError("Unexpected assignment to \"" + lhs_str +
                          "\" when specifying " + self.__scope.value)
 
     def visit_Call(self, call):
@@ -100,7 +100,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         if self.__scope == IOA.EFF or \
                 self.__scope == IOA.PRE or \
                 self.__scope == IOA.INITIALLY or \
-                self.__scope == IOA.INVARIANT or \
+                self.__scope == IOA.INVARIANT_OF or \
                 self.__scope == IOA.WHERE:
             return self.visit_ExternalCall(call)
         # else:
@@ -184,7 +184,9 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         # Check if name is a not reserved word
         if not IOA.get(name.id, None):
             return self.visit_Identifier(name.id)
-        if self.__scope == IOA.TRANSITION:
+        # name.id is a reserved word
+        if self.__scope == IOA.FORMAL_ACT or \
+                self.__scope == IOA.TRANSITION:
             return self.visit_ActionType(name.id)
         # else:
         raise ValueError("Reserved word \"" + name.id + "\" is used as an identifier")

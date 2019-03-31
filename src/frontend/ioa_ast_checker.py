@@ -58,7 +58,7 @@ class IOAAstChecker(IOAAstVisitor):
                           eq_one=[IOA.SIGNATURE, IOA.STATES,
                                   IOA.TRANSITIONS],
                           leq_one=[IOA.WHERE, IOA.INITIALLY, IOA.TRAJECTORIES],
-                          optional=[IOA.INVARIANT])
+                          optional=[IOA.INVARIANT_OF])
         return IOA.AUTOMATON
 
     def visit_AutomatonInstance(self, aut_inst):
@@ -75,7 +75,7 @@ class IOAAstChecker(IOAAstVisitor):
         self.__check_list(ioa_iter,
                           eq_one=[IOA.COMPONENTS],
                           leq_one=[IOA.WHERE],
-                          optional=[IOA.INVARIANT])
+                          optional=[IOA.INVARIANT_OF])
         return IOA.COMPOSITION
 
     def visit_ComponentList(self, comp_list):
@@ -162,7 +162,7 @@ class IOAAstChecker(IOAAstVisitor):
     def visit_Invariant(self, cond):
         assert isinstance(cond, ast.expr)
         # TODO Check invariant is bool
-        return IOA.INVARIANT
+        return IOA.INVARIANT_OF
 
     def visit_Precondition(self, cond):
         assert isinstance(cond, ast.expr)

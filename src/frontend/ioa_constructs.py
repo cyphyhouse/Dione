@@ -30,7 +30,7 @@ class IOA(AutoName):
     INITIALLY = auto()
     INPUT = auto()
     INTERNAL = auto()
-    INVARIANT = auto()
+    INVARIANT_OF = auto()
     OUTPUT = auto()
     PASS = auto()
     PRE = auto()

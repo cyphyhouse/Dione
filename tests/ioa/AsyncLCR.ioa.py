@@ -10,7 +10,7 @@ def Sys(u0: UID, u1: UID, u2: UID):
         P1: AsyncLCR1(u1)
         P2: AsyncLCR2(u2)
 
-    invariant = (
+    invariant_of = (
             implies(u0 != max(u0, u1, u2), P0.status == UNKNOWN) and
             implies(u1 != max(u0, u1, u2), P1.status == UNKNOWN) and
             implies(u2 != max(u0, u1, u2), P2.status == UNKNOWN)
