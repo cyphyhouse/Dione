@@ -3,24 +3,84 @@ import ast
 from typing import List, Optional
 
 from src.frontend.ioa_ast_visitor import IOAAstVisitor
+from src.frontend.ioa_constructs import IOA
 
 
 class TranslatorDafny(IOAAstVisitor):
     def __init__(self):
         super().__init__()
-        self.__parameters = ""
+        self.__parameters = None
 
     def __automaton_module(self, aut: ast.FunctionDef) -> str:
         ret = "module " + aut.name + " {\n"
 
         self.__parameters = self.visit(aut.args)
-        if self.__parameters:
-            ret += "datatype Parameter = Parameter(" + self.__parameters + ")\n"
+        ret += self.__parameters
 
         for stmt in aut.body:
             ret += self.visit(stmt) + "\n"
 
         ret += "}\n"
+        return ret
+
+    def __func_signature(self, construct, name=None):
+        if construct not in [
+                IOA.EFF, IOA.PRE, IOA.TRANSITIONS,
+                IOA.INPUT, IOA.OUTPUT, IOA.INTERNAL,
+                IOA.INITIALLY, IOA.INVARIANT_OF]:
+            raise RuntimeError("Unexpected IOA construct")
+        if not name:
+            if construct in [IOA.PRE, IOA.EFF]:
+                raise RuntimeError("Function name is required for precondition or effect")
+            # else:
+            name = str(construct)
+
+        ret = ""
+        if construct in [IOA.EFF]:
+            ret += "function"
+        else:
+            ret += "predicate"
+        ret += " " + name + "("
+        if construct in \
+                [IOA.EFF, IOA.PRE,
+                 IOA.INPUT, IOA.OUTPUT, IOA.INTERNAL,
+                 IOA.TRANSITIONS]:
+            ret += "act: Action,"
+        ret += "s: State"
+        if construct == IOA.TRANSITIONS:
+            ret += ", s': State"
+        if self.__parameters:
+            ret += ", para: Parameter"
+        ret += ")"
+        if construct in [IOA.EFF]:
+            ret += ": State"
+        return ret
+
+    def __func_call(self, construct, name=None):
+        if construct not in [
+                IOA.EFF, IOA.PRE, IOA.TRANSITIONS,
+                IOA.INPUT, IOA.OUTPUT, IOA.INTERNAL,
+                IOA.INITIALLY, IOA.INVARIANT_OF]:
+            raise RuntimeError("Unexpected IOA construct")
+        if not name:
+            if construct in [IOA.PRE, IOA.EFF]:
+                raise RuntimeError("Function name is required for precondition or effect")
+            # else:
+            name = str(construct)
+
+        ret = name + "("
+        if construct in \
+                [IOA.EFF, IOA.PRE,
+                 IOA.INPUT, IOA.OUTPUT, IOA.INTERNAL,
+                 IOA.TRANSITIONS]:
+            ret += "act, "
+        ret += "s"
+        if construct == IOA.TRANSITIONS:
+            ret += ", s'"
+        if self.__parameters:
+            ret += ", para"
+        ret += ")"
+
         return ret
 
     def visit_BoolOp(self, exp) -> str:
@@ -81,7 +141,7 @@ class TranslatorDafny(IOAAstVisitor):
         return super().visit_Call(exp)
 
     def visit_Num(self, exp):
-        raise NotImplementedError
+        return str(exp.n)
 
     def visit_Str(self, exp):
         raise NotImplementedError
@@ -105,12 +165,19 @@ class TranslatorDafny(IOAAstVisitor):
         raise NotImplementedError
 
     def visit_Attribute(self, exp):
-        # TODO
-        return "ATTR_EXP"
+        # Special case: printing 3.__abs__() is a syntax error,
+        # so if t.value is an integer literal then we need to parenthesize it
+        # to get (3).__abs__().
+        if isinstance(exp.value, ast.Num) and isinstance(exp.value.n, int):
+            ret = "(" + self.visit(exp.value) + ")"
+        else:
+            ret = self.visit(exp.value)
+        ret += "." + exp.attr
+        return ret
 
     def visit_Subscript(self, exp) -> str:
-        # TODO
-        return "SUBSCRIPT_EXP"
+        # TODO Should use angle brackets for parametrized type in Dafny
+        return self.visit(exp.value) + "[" + self.visit(exp.slice) + "]"
 
     def visit_Starred(self, exp):
         raise NotImplementedError
@@ -125,13 +192,22 @@ class TranslatorDafny(IOAAstVisitor):
         raise NotImplementedError
 
     def visit_Slice(self, slc):
-        raise NotImplementedError
+        ret = ""
+        if slc.lower:
+            ret += self.visit(slc.lower)
+        ret += ".."
+        if slc.upper:
+            ret += self.visit(slc.lower)
+        if slc.step:
+            raise RuntimeError(
+                "Dafny does not support step size in taking sub-sequences")
+        return ret
 
     def visit_ExtSlice(self, slc):
         raise NotImplementedError
 
     def visit_Index(self, slc):
-        raise NotImplementedError
+        return self.visit(slc.value)
 
     def visit_And(self, _) -> str:
         return "&&"
@@ -230,7 +306,7 @@ class TranslatorDafny(IOAAstVisitor):
         ret = ""
         for stmt in spec.body:
             ret += self.visit(stmt)
-        # TODO
+        # TODO Group type definitions together
         return ret
 
     def visit_TypeDef(self, lhs: ast.expr, rhs: ast.expr) -> str:
@@ -240,16 +316,34 @@ class TranslatorDafny(IOAAstVisitor):
     def visit_Composition(self, comp: ast.FunctionDef) -> str:
         return self.__automaton_module(comp)
 
-    def visit_ComponentList(self, comp_list: ast.ClassDef):
-        # TODO
-        return ""
+    def visit_ComponentList(self, comp_list: ast.ClassDef) -> str:
+        # TODO how to define states and assign parameter values
+        states = "datatype State = State()"
+        return "\n".join(map(self.visit, comp_list.body)) + '\n' + states
+
+    def visit_DeclComponent(self, lhs: ast.expr, typ: ast.expr,
+                            rhs: Optional[ast.expr]) -> str:
+        if not isinstance(lhs, ast.Name):
+            raise NotImplementedError("Declaring a sequence of automata is not supported yet")
+        name = self.visit(lhs)
+        module = self.visit(typ)
+        assert rhs is None
+        return "import " + name + " = " + module
+
+    def visit_AutomatonInstance(self, aut_inst: ast.Call) -> str:
+        assert isinstance(aut_inst.func, ast.Name)
+        # TODO how to return actual parameters for each component automaton
+        return self.visit(aut_inst.func)
 
     def visit_PrimitiveAutomaton(self, prim: ast.FunctionDef) -> str:
         return self.__automaton_module(prim)
 
     def visit_FormalParameters(self, para_list: List[ast.arg]) -> str:
-        # TODO
-        return ", ".join(map(self.visit, para_list))
+        if para_list:
+            return "datatype Parameter = Parameter(" + \
+                   ", ".join(map(self.visit, para_list)) + ")\n"
+        # else:
+        return ""
 
     def visit_FormalPara(self, para: ast.arg) -> str:
         assert para.annotation
@@ -257,6 +351,13 @@ class TranslatorDafny(IOAAstVisitor):
 
     def visit_Signature(self, sig: ast.ClassDef) -> str:
         # TODO Collect actions for creating the global set of actions
+        for stmt in sig.body:
+            self.visit(stmt)
+        return ""
+
+    def visit_FormalAction(self, act: ast.FunctionDef) -> str:
+        # TODO
+        list(map(self.visit, act.decorator_list))
         return ""
 
     def visit_States(self, states: ast.ClassDef) -> str:
@@ -275,27 +376,65 @@ class TranslatorDafny(IOAAstVisitor):
         return lhs.id + ": " + self.visit(typ)
 
     def visit_TransitionList(self, tran_list: ast.ClassDef) -> str:
-        # TODO
-        return ""
+        tran_rel = self.__func_signature(IOA.TRANSITIONS) + \
+                   "{\n" + "RELATION_BODY" + "\n}\n"
+
+        return "\n".join(map(self.visit, tran_list.body)) + "\n" + tran_rel
+
+    def visit_Transition(self, tran: ast.FunctionDef) -> str:
+        pred_pre = self.__func_signature(IOA.PRE, "pre_" + tran.name) + \
+                   "{" + "act." + tran.name + "?&&" + \
+                   "&&".join(map(self.visit, tran.decorator_list)) + "}\n"
+        func_eff = self.__func_signature(IOA.EFF, "eff_" + tran.name) + \
+                   "{\n" + self.visit(tran.body) + "\n}\n"
+        return pred_pre + func_eff
+
+    def visit_ActionType(self, act_typ: IOA) -> str:
+        if self._get_scope() == IOA.FORMAL_ACT:
+            return act_typ
+        if self._get_scope() == IOA.TRANSITION:
+            return self.__func_call(act_typ)
+
+    def visit_Precondition(self, cond: ast.expr) -> str:
+        return self.visit(cond)
+
+    def visit_Effect(self, stmt_list: List[ast.stmt]) -> str:
+        def __enclose(stmt) -> str:
+            stmt_str = self.visit(stmt)
+            return "var s: State := " + stmt_str + ";"
+
+        return "\n".join(map(__enclose, stmt_list)) + " s"
 
     def visit_Initially(self, cond: ast.expr) -> str:
-        add_para = ", para: Parameter" if self.__parameters else ""
-        return "predicate Initial(s: State" + add_para + ") { " + \
-               self.visit(cond) + \
-               " }\n"
+        return self.__func_signature(IOA.INITIALLY) + \
+               "{ " + self.visit(cond) + " }\n"
 
     def visit_Invariant(self, cond: ast.expr) -> str:
-        add_para = ", para: Parameter" if self.__parameters else ""
-        return "predicate Invariant(s: State" + add_para + ") { " + \
-               self.visit(cond) + \
-               " }\n"
+        return self.__func_signature(IOA.INVARIANT_OF) + \
+               "{ " + self.visit(cond) + " }\n"
 
     def visit_Where(self, cond: ast.expr) -> str:
-        # TODO
+        # TODO how to specify "where" constraint
+        self.visit(cond)
         return ""
+
+    def visit_StmtAssign(self, lhs: ast.expr, rhs: ast.expr) -> str:
+        # TODO handle rhs differently to get state and parameter variables accordingly
+        return "s.(" + \
+               self.visit(lhs) + " := " + self.visit(rhs) + \
+               ")"
+
+    def visit_StmtIf(self, stmt: ast.If) -> str:
+        return "if " + self.visit(stmt.test) + "\n" + \
+               "then " + self.visit(stmt.body) + "\n" + \
+               "else " + self.visit(stmt.orelse)
+
+    def visit_StmtPass(self, stmt: ast.Pass) -> str:
+        return "s"  # return the same state
 
     def visit_Identifier(self, name: str) -> str:
         # TODO Are there more built-in types to translate?
+        # TODO Automatically access variables from s, act, para
         return {"Char": "char",
                 "Int": "int",
                 "Nat": "nat",
