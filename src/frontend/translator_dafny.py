@@ -10,14 +10,20 @@ class TranslatorDafny(IOAAstVisitor):
     def __init__(self):
         super().__init__()
         self.__parameters = None
+        self.__global_signature = {}
 
     def __automaton_module(self, aut: ast.FunctionDef) -> str:
         ret = "module " + aut.name + " {\n"
 
+        ret += "import opened Types\n"  # Import type definitions
+
         self.__parameters = self.visit(aut.args)
-        ret += self.__parameters
+        if self.__parameters:
+            ret += "datatype Parameter = Parameter(" + \
+                   self.__parameters + ")\n"
 
         for stmt in aut.body:
+            # TODO Deal with where constraints
             ret += self.visit(stmt) + "\n"
 
         ret += "}\n"
@@ -40,15 +46,17 @@ class TranslatorDafny(IOAAstVisitor):
             ret += "function"
         else:
             ret += "predicate"
+
         ret += " " + name + "("
-        if construct in \
-                [IOA.EFF, IOA.PRE,
-                 IOA.INPUT, IOA.OUTPUT, IOA.INTERNAL,
-                 IOA.TRANSITIONS]:
-            ret += "act: Action,"
-        ret += "s: State"
-        if construct == IOA.TRANSITIONS:
-            ret += ", s': State"
+        if construct in [IOA.INPUT, IOA.OUTPUT, IOA.INTERNAL]:
+            ret += "act: Action"
+        elif construct in [IOA.INITIALLY, IOA.INVARIANT_OF]:
+            ret += "s: State"
+        elif construct in [IOA.EFF, IOA.PRE]:
+            ret += "act: Action, s: State"
+        else:
+            assert construct == IOA.TRANSITIONS
+            ret += "s: State, act: Action, s': State"
         if self.__parameters:
             ret += ", para: Parameter"
         ret += ")"
@@ -83,6 +91,7 @@ class TranslatorDafny(IOAAstVisitor):
 
         return ret
 
+    # region Python expression visitors
     def visit_BoolOp(self, exp) -> str:
         op_str = self.visit(exp.op)
         return "(" + op_str.join(map(self.visit, exp.values)) + ")"
@@ -155,8 +164,13 @@ class TranslatorDafny(IOAAstVisitor):
     def visit_Bytes(self, exp):
         raise NotImplementedError
 
-    def visit_NameConstant(self, exp):
-        raise NotImplementedError
+    def visit_NameConstant(self, exp) -> str:
+        if exp.value is True:
+            return "true"
+        if exp.value is False:
+            return "false"
+        # else:
+        raise RuntimeError("Unsupported Python constant" + str(exp.value))
 
     def visit_Ellipsis(self, exp):
         raise NotImplementedError
@@ -176,7 +190,13 @@ class TranslatorDafny(IOAAstVisitor):
         return ret
 
     def visit_Subscript(self, exp) -> str:
-        # TODO Should use angle brackets for parametrized type in Dafny
+        # FIXME We can also do this case split in IOAAstVisitor, for example,
+        #  call visit_GenericType() or visit_ExprSubscript() based on cases
+        if self._get_scope() in \
+                [IOA.TYPE_DEF, IOA.FORMAL_PARA, IOA.DECL_VAR]:
+            # Angle brackets are used for parametrized type in Dafny
+            return self.visit(exp.value) + "<" + self.visit(exp.slice) + ">"
+        # else:
         return self.visit(exp.value) + "[" + self.visit(exp.slice) + "]"
 
     def visit_Starred(self, exp):
@@ -301,24 +321,28 @@ class TranslatorDafny(IOAAstVisitor):
     def visit_NotIn(self, _) -> str:
         return "!in"
 
-    # IOA specific language constructs
+    # endregion
+
+    # region IOA specific language constructs visitors
     def visit_IOASpec(self, spec: ast.Module) -> str:
         ret = ""
         for stmt in spec.body:
-            ret += self.visit(stmt)
-        # TODO Group type definitions together
+            ret += self.visit(stmt) + "\n"
+        # TODO Group type definitions together and create a module for types
+
         return ret
 
     def visit_TypeDef(self, lhs: ast.expr, rhs: ast.expr) -> str:
-        # TODO
-        return ""
+        assert isinstance(lhs, ast.Name)
+        return "type " + self.visit(lhs) + " = " + "TYPE_CONSTRUCTOR"  # TODO  self.visit(rhs)
 
     def visit_Composition(self, comp: ast.FunctionDef) -> str:
         return self.__automaton_module(comp)
 
     def visit_ComponentList(self, comp_list: ast.ClassDef) -> str:
-        # TODO how to define states and assign parameter values
-        states = "datatype State = State()"
+        # TODO define states and assign parameter values
+        states = "datatype State = State(" + "TODO_STATES" + ")"
+        # TODO define transitions
         return "\n".join(map(self.visit, comp_list.body)) + '\n' + states
 
     def visit_DeclComponent(self, lhs: ast.expr, typ: ast.expr,
@@ -340,8 +364,7 @@ class TranslatorDafny(IOAAstVisitor):
 
     def visit_FormalParameters(self, para_list: List[ast.arg]) -> str:
         if para_list:
-            return "datatype Parameter = Parameter(" + \
-                   ", ".join(map(self.visit, para_list)) + ")\n"
+            return ", ".join(map(self.visit, para_list))
         # else:
         return ""
 
@@ -350,15 +373,37 @@ class TranslatorDafny(IOAAstVisitor):
         return para.arg + ": " + self.visit(para.annotation)
 
     def visit_Signature(self, sig: ast.ClassDef) -> str:
-        # TODO Collect actions for creating the global set of actions
-        for stmt in sig.body:
-            self.visit(stmt)
-        return ""
+        # FIXME constructing dictionary from string is dangerous
+        dict_str = "{" + ", ".join(map(self.visit, sig.body)) + "}"
+        act_dict = ast.literal_eval(dict_str)
+        # Collect actions for creating the global set of actions
+        for name, (sig, _, _) in act_dict.items():
+            if self.__global_signature.get(name, sig) != sig:
+                raise RuntimeError("Signature of action \"" + name + "\" doesn't match")
+            self.__global_signature[name] = sig
+        # Construct input, output, and internal predicates
+        pred_dict = {"input": "false",
+                     "output": "false",
+                     "internal": "false"}
+        for name, (sig, typ, where) in act_dict.items():
+            pred = "act." + name + "?"
+            if where:
+                pred += "&&" + where
+            pred_dict[typ] += "||(" + pred + ")"
+        ret = ""
+        for typ, pred_body in pred_dict.items():
+            ret += self.__func_signature(IOA.get(typ, None)) + \
+                "{" + pred_body + "}\n"
+        return ret
 
     def visit_FormalAction(self, act: ast.FunctionDef) -> str:
-        # TODO
-        list(map(self.visit, act.decorator_list))
-        return ""
+        assert len(act.decorator_list) == 1
+        act_typ = self.visit(act.decorator_list[0])
+        act_sig = act.name + "(" + self.visit(act.args) + ")"
+        assert len(act.body) == 1
+        act_where = self.visit(act.body[0])
+        # FIXME Returning an entry of a dictionary as a string is a really dirty hack
+        return "'" + act.name + "' : ('" + act_sig + "', '" + act_typ + "', '" + act_where + "')"
 
     def visit_States(self, states: ast.ClassDef) -> str:
         ret = "datatype State = State("
@@ -369,8 +414,8 @@ class TranslatorDafny(IOAAstVisitor):
     def visit_DeclStateVar(self, lhs: ast.expr, typ: ast.expr,
                            rhs: Optional[ast.expr]) -> str:
         assert isinstance(lhs, ast.Name)
-        # AST should have been preprocessed so that initial values are
-        # specified via initially predicate
+        # FIXME This assumes that AST should have been preprocessed so that
+        #  initial values are specified only via initially predicate
         assert rhs is None  # TODO error message
 
         return lhs.id + ": " + self.visit(typ)
@@ -391,7 +436,7 @@ class TranslatorDafny(IOAAstVisitor):
 
     def visit_ActionType(self, act_typ: IOA) -> str:
         if self._get_scope() == IOA.FORMAL_ACT:
-            return act_typ
+            return str(act_typ)
         if self._get_scope() == IOA.TRANSITION:
             return self.__func_call(act_typ)
 
@@ -414,9 +459,7 @@ class TranslatorDafny(IOAAstVisitor):
                "{ " + self.visit(cond) + " }\n"
 
     def visit_Where(self, cond: ast.expr) -> str:
-        # TODO how to specify "where" constraint
-        self.visit(cond)
-        return ""
+        return self.visit(cond)
 
     def visit_StmtAssign(self, lhs: ast.expr, rhs: ast.expr) -> str:
         # TODO handle rhs differently to get state and parameter variables accordingly
@@ -430,10 +473,12 @@ class TranslatorDafny(IOAAstVisitor):
                "else " + self.visit(stmt.orelse)
 
     def visit_StmtPass(self, stmt: ast.Pass) -> str:
-        return "s"  # return the same state
+        if self._get_scope() == IOA.EFF:
+            return "s"  # return the same state
+        # else:
+        return ""
 
     def visit_Identifier(self, name: str) -> str:
-        # TODO Are there more built-in types to translate?
         # TODO Automatically access variables from s, act, para
         return {"Char": "char",
                 "Int": "int",
@@ -443,6 +488,7 @@ class TranslatorDafny(IOAAstVisitor):
                 "Map": "map",
                 "Set": "set",
                 "Mset": "multiset",
+                # Are there more built-in types to translate?
                 }.get(name, name)
 
     def visit_ExternalCall(self, call: ast.Call) -> str:
@@ -456,3 +502,5 @@ class TranslatorDafny(IOAAstVisitor):
         # TODO use built-in operators
         return self.visit(call.func) + "(" + \
                ", ".join(map(self.visit, call.args)) + ")"
+
+    # endregion
