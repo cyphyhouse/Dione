@@ -88,7 +88,8 @@ class IOAAstChecker(IOAAstVisitor):
         return IOA.COMPONENTS
 
     def visit_DeclComponent(self, lhs, typ, rhs):
-        assert isinstance(lhs, ast.Name)
+        if not isinstance(lhs, ast.Name):
+            raise NotImplementedError("Declaring a sequence of automata is not supported yet")
         assert isinstance(typ, ast.expr)
         assert rhs is None
 
