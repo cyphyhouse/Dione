@@ -22,7 +22,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     def _get_scope(self):
         return self.__scope
 
-    # Python language constructs
+    # region Python language constructs
     def visit_AnnAssign(self, node):
         """ Variable annotated with type hints and followed by an optional assigned value. """
         if not isinstance(node.target, ast.Name):
@@ -35,13 +35,15 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
                 with IOAScopeHandler(self.__scope, IOA.TYPE_DEF):
                     return self.visit_TypeDef(node.target, node.value)
         if self.__scope == IOA.STATES:
+            if not isinstance(node.target, ast.Name):
+                raise ValueError("Left-hand side must be an identifier for declaring state variables.")
             with IOAScopeHandler(self.__scope, IOA.DECL_VAR):
                 return self.visit_DeclStateVar(node.target, node.annotation, node.value)
         if self.__scope == IOA.COMPONENTS:
             with IOAScopeHandler(self.__scope, IOA.DECL_COMPONENT):
                 return self.visit_DeclComponent(node.target, node.annotation, node.value)
         # else:
-        raise ValueError("Unexpected variable with type hints \"" + node.target.id +
+        raise ValueError("Unexpected typed variable\"" + node.target.id +
                          "\" when specifying " + self.__scope.value)
 
     def visit_Assign(self, node):
@@ -234,7 +236,9 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         raise ValueError("Unexpected list " + str(ls) +
                          " when specifying " + self.__scope.value)
 
-    # IOA specific language constructs
+    # endregion
+
+    # region IOA specific language constructs
     def visit_IOASpec(self, spec: ast.Module):
         pass
 
@@ -338,3 +342,5 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
 
     def visit_ExternalCall(self, call: ast.Call):
         pass
+
+    # endregion
