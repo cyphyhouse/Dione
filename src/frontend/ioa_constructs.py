@@ -1,4 +1,4 @@
-from enum import Enum, auto
+from enum import Enum, auto, unique
 
 
 class AutoName(Enum):
@@ -7,6 +7,7 @@ class AutoName(Enum):
         return self.lower()
 
 
+@unique
 class IOA(AutoName):
     def __str__(self):
         return str(self.value)
