@@ -1,6 +1,6 @@
 """ Translator from IOA to Dafny proof assistant """
 import ast
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from src.frontend.ioa_ast_visitor import IOAAstVisitor
 from src.frontend.ioa_constructs import IOA
@@ -77,18 +77,20 @@ class TranslatorDafny(IOAAstVisitor):
             name = str(construct)
 
         ret = name + "("
-        if construct in \
-                [IOA.EFF, IOA.PRE,
-                 IOA.INPUT, IOA.OUTPUT, IOA.INTERNAL,
-                 IOA.TRANSITIONS]:
-            ret += "act, "
-        ret += "s"
-        if construct == IOA.TRANSITIONS:
-            ret += ", s'"
+        if construct in [IOA.INPUT, IOA.OUTPUT, IOA.INTERNAL]:
+            ret += "act"
+        elif construct in [IOA.INITIALLY, IOA.INVARIANT_OF]:
+            ret += "s"
+        elif construct in [IOA.EFF, IOA.PRE]:
+            ret += "act, s"
+        else:
+            assert construct == IOA.TRANSITIONS
+            ret += "s, act, s'"
         if self.__parameters:
             ret += ", para"
         ret += ")"
-
+        if construct in [IOA.EFF]:
+            ret += " == s'"
         return ret
 
     # region Python expression visitors
@@ -373,11 +375,10 @@ class TranslatorDafny(IOAAstVisitor):
         return para.arg + ": " + self.visit(para.annotation)
 
     def visit_Signature(self, sig: ast.ClassDef) -> str:
-        # FIXME constructing dictionary from string is dangerous
-        dict_str = "{" + ", ".join(map(self.visit, sig.body)) + "}"
-        act_dict = ast.literal_eval(dict_str)
+        # FIXME This assumes a different return type than str
+        act_iter = map(self.visit, sig.body)
         # Collect actions for creating the global set of actions
-        for name, (sig, _, _) in act_dict.items():
+        for name, (sig, _, _) in act_iter:
             if self.__global_signature.get(name, sig) != sig:
                 raise RuntimeError("Signature of action \"" + name + "\" doesn't match")
             self.__global_signature[name] = sig
@@ -385,7 +386,7 @@ class TranslatorDafny(IOAAstVisitor):
         pred_dict = {"input": "false",
                      "output": "false",
                      "internal": "false"}
-        for name, (sig, typ, where) in act_dict.items():
+        for name, (sig, typ, where) in act_iter:
             pred = "act." + name + "?"
             if where:
                 pred += "&&" + where
@@ -396,14 +397,15 @@ class TranslatorDafny(IOAAstVisitor):
                 "{" + pred_body + "}\n"
         return ret
 
-    def visit_FormalAction(self, act: ast.FunctionDef) -> str:
+    def visit_FormalAction(self, act: ast.FunctionDef) \
+            -> Tuple[str, Tuple[str, str, str]]:
         assert len(act.decorator_list) == 1
         act_typ = self.visit(act.decorator_list[0])
         act_sig = act.name + "(" + self.visit(act.args) + ")"
         assert len(act.body) == 1
         act_where = self.visit(act.body[0])
-        # FIXME Returning an entry of a dictionary as a string is a really dirty hack
-        return "'" + act.name + "' : ('" + act_sig + "', '" + act_typ + "', '" + act_where + "')"
+        # FIXME If possible, return a string like other functions
+        return act.name, (act_sig, act_typ, act_where)
 
     def visit_States(self, states: ast.ClassDef) -> str:
         ret = "datatype State = State("
@@ -421,18 +423,35 @@ class TranslatorDafny(IOAAstVisitor):
         return lhs.id + ": " + self.visit(typ)
 
     def visit_TransitionList(self, tran_list: ast.ClassDef) -> str:
-        tran_rel = self.__func_signature(IOA.TRANSITIONS) + \
-                   "{\n" + "RELATION_BODY" + "\n}\n"
+        # TODO different names to allow multiple (pre, eff) for the same action
+        def _gen_name(act):
+            return "pre_" + act, "eff_" + act
 
-        return "\n".join(map(self.visit, tran_list.body)) + "\n" + tran_rel
+        # FIXME This assumes a different return type than str
+        tran_iter = map(self.visit, tran_list.body)
+        ret = ""
+        tran_rel_body = "false"
+        for name, (pre_body, eff_body) in tran_iter:
+            pre_name, eff_name = _gen_name(name)
+            ret += self.__func_signature(IOA.PRE, pre_name) + \
+                "{" + pre_body + "}\n"
+            ret += self.__func_signature(IOA.EFF, eff_name) + \
+                "{\n" + eff_body + "\n}\n"
+            tran_rel_body += "\n || (" + \
+                self.__func_call(IOA.PRE, pre_name) + " && " + \
+                self.__func_call(IOA.EFF, eff_name) + ")"
 
-    def visit_Transition(self, tran: ast.FunctionDef) -> str:
-        pred_pre = self.__func_signature(IOA.PRE, "pre_" + tran.name) + \
-                   "{" + "act." + tran.name + "?&&" + \
-                   "&&".join(map(self.visit, tran.decorator_list)) + "}\n"
-        func_eff = self.__func_signature(IOA.EFF, "eff_" + tran.name) + \
-                   "{\n" + self.visit(tran.body) + "\n}\n"
-        return pred_pre + func_eff
+        ret += self.__func_signature(IOA.TRANSITIONS) + \
+            "{\n" + tran_rel_body + "\n}\n"
+        return ret
+
+    def visit_Transition(self, tran: ast.FunctionDef) -> Tuple[str, Tuple[str, str]]:
+        assert tran.decorator_list  # At least one decorator
+        pre_body = "act." + tran.name + "?&&" + \
+                   "&&".join(map(self.visit, tran.decorator_list))
+        eff_body = self.visit(tran.body)
+        # FIXME If possible, return a string like other functions
+        return tran.name, (pre_body, eff_body)
 
     def visit_ActionType(self, act_typ: IOA) -> str:
         if self._get_scope() == IOA.FORMAL_ACT:
