@@ -186,7 +186,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         construct = IOA.get(name.id, None)
         # Check if name is a not reserved word
         if not construct:
-            return self.visit_Identifier(name.id)
+            return self.visit_Identifier(name)
         # name.id is a reserved word
         if self.__scope == IOA.FORMAL_ACT or \
                 self.__scope == IOA.TRANSITION:
@@ -286,7 +286,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     def visit_Hidden(self, node):
         raise NotImplementedError("Hidden actions are not supported yet")
 
-    def visit_Identifier(self, name: str):
+    def visit_Identifier(self, name: ast.Name):
         pass
 
     def visit_Signature(self, sig: ast.ClassDef):

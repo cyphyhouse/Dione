@@ -240,7 +240,7 @@ class IOAAstChecker(IOAAstVisitor):
         # TODO Do we have to differentiate pass statements appearing under different constructs
         return IOA.PASS
 
-    def visit_Identifier(self, name: str):
+    def visit_Identifier(self, name: ast.Name):
         # TODO
         return IOA.IDENTIFIER
 
