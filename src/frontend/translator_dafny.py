@@ -1,5 +1,6 @@
 """ Translator from IOA to Dafny proof assistant """
 import ast
+import symtable
 from typing import List, Optional, Tuple
 
 from src.frontend.ioa_ast_visitor import IOAAstVisitor
@@ -7,10 +8,105 @@ from src.frontend.ioa_constructs import IOA
 
 
 class TranslatorDafny(IOAAstVisitor):
-    def __init__(self):
+    ioa2dfy = {"Char": "char",
+               "Int": "int",
+               "Nat": "nat",
+               "Real": "real",
+               "Seq": "seq",
+               "Map": "map",
+               "Set": "set",
+               "Mset": "multiset",
+               "forall": "forall",
+               "exists": "exists",
+               "implies": "==>",
+               "explies": "<==",
+               "disjoint": "!!",
+               "max": "max"
+               # Are there more built-in types to translate?
+               }
+
+    class __IOANamespace:
+        def __init__(self, sym_tab: symtable.SymbolTable):
+            # FIXME Use another visitor to initialize namespaces
+            assert sym_tab.get_type() == "module"
+            self.__system = \
+                set(TranslatorDafny.ioa2dfy.keys()) \
+                | set(sym_tab.get_identifiers()) | set([e.value for e in IOA])
+
+            self.__parameters = {}
+            self.__states = {}
+            self.__act_formals = {}
+            for aut_sym in sym_tab.get_children():
+                # Collect automaton parameters
+                assert isinstance(aut_sym, symtable.Function)
+                aut_name = aut_sym.get_name()
+                assert self.system.isdisjoint(set(aut_sym.get_parameters()))
+                self.__parameters[aut_name] = set(aut_sym.get_parameters())
+
+                # Collect state variables
+                if str(IOA.STATES) in aut_sym.get_identifiers():
+                    states_sym = aut_sym.lookup(str(IOA.STATES)).get_namespace()
+                elif str(IOA.COMPONENTS) in aut_sym.get_identifiers():
+                    states_sym = aut_sym.lookup(str(IOA.COMPONENTS)).get_namespace()
+                else:
+                    # FIXME May through error for definitions of simulation relations
+                    raise RuntimeError("Cannot find either states or components")
+                self.__states[aut_name] = \
+                    set(states_sym.get_identifiers()) \
+                    - self.__parameters[aut_name] - self.__system
+
+                # Collect all parameterized actions
+                if str(IOA.SIGNATURE) not in aut_sym.get_identifiers():
+                    continue
+                sig_sym = aut_sym.lookup(str(IOA.SIGNATURE)).get_namespace()
+                for act_sym in sig_sym.get_children():
+                    assert isinstance(act_sym, symtable.Function)
+                    act_name = act_sym.get_name()
+                    assert set(act_sym.get_parameters()).isdisjoint(self.system)
+                    assert set(act_sym.get_parameters()).isdisjoint(self.parameters[aut_name])
+
+                    if not self.__act_formals.get(act_name, None):
+                        self.__act_formals[act_name] = set(act_sym.get_parameters())
+                    assert self.__act_formals[act_name] == set(act_sym.get_parameters())
+
+        @property
+        def act_formals(self):
+            return self.__act_formals
+
+        @property
+        def states(self):
+            return self.__states
+
+        @property
+        def parameters(self):
+            return self.__parameters
+
+        @property
+        def system(self):
+            return self.__system
+
+        def add_namespace(self, identifier: str) -> str:
+            # FIXME check against a specific automaton and action instead of
+            #  all automaton and all actions
+            if identifier in self.system:
+                return identifier
+            for parameters in self.parameters.values():
+                if identifier in parameters:
+                    return "para." + identifier
+            for states in self.states.values():
+                if identifier in states:
+                    return "s." + identifier
+            for act_formals in self.act_formals.values():
+                if identifier in act_formals:
+                    return "act." + identifier
+            # else:
+            raise RuntimeError("Unexpected identifier \"" + identifier + "\"")
+
+    def __init__(self, sym_tab: symtable.SymbolTable):
         super().__init__()
         self.__parameters = None
         self.__global_signature = {}
+        self.__current_namespace = self.__IOANamespace(sym_tab)
 
     def __automaton_module(self, aut: ast.FunctionDef) -> str:
         ret = "module " + aut.name + " {\n"
@@ -331,6 +427,11 @@ class TranslatorDafny(IOAAstVisitor):
         for stmt in spec.body:
             ret += self.visit(stmt) + "\n"
         # TODO Group type definitions together and create a module for types
+        ret += "module Types {\n" \
+               "newtype UID = u: nat| 0 <= u < 3\n" \
+               "datatype Status = UNKNOWN | CHOSEN | REPORTED\n" \
+               "datatype Action = from0to1(v: UID) | from2to0(v:UID) | leader_0\n" \
+               "}\n"
 
         return ret
 
@@ -376,17 +477,19 @@ class TranslatorDafny(IOAAstVisitor):
 
     def visit_Signature(self, sig: ast.ClassDef) -> str:
         # FIXME This assumes a different return type than str
-        act_iter = map(self.visit, sig.body)
+        act_list = list(map(self.visit, sig.body))
         # Collect actions for creating the global set of actions
-        for name, (sig, _, _) in act_iter:
-            if self.__global_signature.get(name, sig) != sig:
+        for name, (sig, _, _) in act_list:
+            stored_sig = self.__global_signature.get(name, None)
+            if not stored_sig:
+                self.__global_signature[name] = sig
+            elif stored_sig != sig:
                 raise RuntimeError("Signature of action \"" + name + "\" doesn't match")
-            self.__global_signature[name] = sig
         # Construct input, output, and internal predicates
         pred_dict = {"input": "false",
                      "output": "false",
                      "internal": "false"}
-        for name, (sig, typ, where) in act_iter:
+        for name, (sig, typ, where) in act_list:
             pred = "act." + name + "?"
             if where:
                 pred += "&&" + where
@@ -419,7 +522,6 @@ class TranslatorDafny(IOAAstVisitor):
         # FIXME This assumes that AST should have been preprocessed so that
         #  initial values are specified only via initially predicate
         assert rhs is None  # TODO error message
-
         return lhs.id + ": " + self.visit(typ)
 
     def visit_TransitionList(self, tran_list: ast.ClassDef) -> str:
@@ -435,8 +537,9 @@ class TranslatorDafny(IOAAstVisitor):
             pre_name, eff_name = _gen_name(name)
             ret += self.__func_signature(IOA.PRE, pre_name) + \
                 "{" + pre_body + "}\n"
-            ret += self.__func_signature(IOA.EFF, eff_name) + \
-                "{\n" + eff_body + "\n}\n"
+            ret += self.__func_signature(IOA.EFF, eff_name) + "\n" + \
+                "requires " + self.__func_call(IOA.PRE, pre_name) + \
+                "\n{\n" + eff_body + "\n}\n"
             tran_rel_body += "\n || (" + \
                 self.__func_call(IOA.PRE, pre_name) + " && " + \
                 self.__func_call(IOA.EFF, eff_name) + ")"
@@ -497,29 +600,24 @@ class TranslatorDafny(IOAAstVisitor):
         # else:
         return ""
 
-    def visit_Identifier(self, name: str) -> str:
-        # TODO Automatically access variables from s, act, para
-        return {"Char": "char",
-                "Int": "int",
-                "Nat": "nat",
-                "Real": "real",
-                "Seq": "seq",
-                "Map": "map",
-                "Set": "set",
-                "Mset": "multiset",
-                # Are there more built-in types to translate?
-                }.get(name, name)
+    def visit_Identifier(self, name: ast.Name) -> str:
+        # FIXME We can also do this case split in IOAAstVisitor, for example,
+        #  call visit_LValue() or visit_EValue() based on cases
+        # A parameter declaration or L-values in an assignment
+        if isinstance(name.ctx, ast.Param) or \
+                isinstance(name.ctx, ast.Store) or \
+                isinstance(name.ctx, ast.AugStore):
+            assert name.id not in self.ioa2dfy
+            return name.id
+        # else:  # R-value in assignment or type annotations
+        ret = self.__current_namespace.add_namespace(name.id)
+        # FIXME do we need ioa2dfy mapping at all?
+        return self.ioa2dfy.get(ret, ret)
 
     def visit_ExternalCall(self, call: ast.Call) -> str:
         assert not call.keywords
-        dafny_op = {"forall": "forall",
-                    "exists": "exists",
-                    "implies": "==>",
-                    "explies": "<==",
-                    "disjoint": "!!",
-                    }
         # TODO use built-in operators
         return self.visit(call.func) + "(" + \
-               ", ".join(map(self.visit, call.args)) + ")"
+            ", ".join(map(self.visit, call.args)) + ")"
 
     # endregion
