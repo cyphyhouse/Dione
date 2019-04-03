@@ -63,7 +63,8 @@ class IOAAstChecker(IOAAstVisitor):
 
     def visit_AutomatonInstance(self, aut_inst):
         assert isinstance(aut_inst, ast.Call)
-        # TODO
+        # TODO Check if the number of arguments matches the automaton definition
+        # TODO Check if the actual parameters use only parameters or global identifiers
         return IOA.AUTOMATON_INSTANCE
 
     def visit_Composition(self, comp):
@@ -78,10 +79,10 @@ class IOAAstChecker(IOAAstVisitor):
                           optional=[IOA.INVARIANT_OF])
         return IOA.COMPOSITION
 
-    def visit_ComponentList(self, comp_list):
-        assert isinstance(comp_list, ast.ClassDef)
+    def visit_ComponentList(self, comps):
+        assert isinstance(comps, ast.ClassDef)
 
-        ioa_iter = map(self.visit, comp_list.body)
+        ioa_iter = map(self.visit, comps.body)
         self.__check_list(ioa_iter,
                           geq_one=[IOA.DECL_COMPONENT],
                           leq_one=[IOA.HIDDEN])
@@ -217,7 +218,14 @@ class IOAAstChecker(IOAAstVisitor):
         self.visit(rhs)
         return IOA.TYPE_DEF
 
-    def visit_Where(self, cond):
+    def visit_AutomatonWhere(self, cond: ast.expr):
+        assert isinstance(cond, ast.expr)
+
+        # TODO Check where clause is bool
+        self.visit(cond)
+        return IOA.WHERE
+
+    def visit_ActionWhere(self, cond: ast.expr):
         assert isinstance(cond, ast.expr)
 
         # TODO Check where clause is bool

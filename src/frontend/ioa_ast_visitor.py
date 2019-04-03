@@ -66,18 +66,18 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
                     return self.visit_Invariant(node.value)
             if lhs_str == str(IOA.WHERE):
                 with IOAScopeHandler(self.__scope, IOA.WHERE):
-                    return self.visit_Where(node.value)
+                    return self.visit_AutomatonWhere(node.value)
         if self.__scope == IOA.COMPOSITION:
             if lhs_str == str(IOA.INVARIANT_OF):
                 with IOAScopeHandler(self.__scope, IOA.INVARIANT_OF):
                     return self.visit_Invariant(node.value)
             if lhs_str == str(IOA.WHERE):
                 with IOAScopeHandler(self.__scope, IOA.WHERE):
-                    return self.visit_Where(node.value)
+                    return self.visit_AutomatonWhere(node.value)
         if self.__scope == IOA.FORMAL_ACT:
             if lhs_str == str(IOA.WHERE):
                 with IOAScopeHandler(self.__scope, IOA.WHERE):
-                    return self.visit_Where(node.value)
+                    return self.visit_ActionWhere(node.value)
         if self.__scope == IOA.EFF:
             return self.visit_StmtAssign(node.targets[0], node.value)
         # else:
@@ -251,7 +251,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     def visit_Composition(self, comp: ast.FunctionDef):
         pass
 
-    def visit_ComponentList(self, comp_list: ast.ClassDef):
+    def visit_ComponentList(self, comps: ast.ClassDef):
         pass
 
     def visit_DeclStateVar(self, lhs: ast.expr, typ: ast.expr,
@@ -319,7 +319,10 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     def visit_Precondition(self, cond: ast.expr):
         pass
 
-    def visit_Where(self, cond: ast.expr):
+    def visit_AutomatonWhere(self, cond: ast.expr):
+        pass
+
+    def visit_ActionWhere(self, cond: ast.expr):
         pass
 
     def visit_StmtAssign(self, lhs: ast.expr, rhs: ast.expr):
