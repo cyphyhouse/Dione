@@ -168,7 +168,8 @@ class TranslatorDafny(IOAAstVisitor):
         # else:
         return "predicate " + func_name_args
 
-    def __body_block(self, body: str, one_line=False) -> str:
+    @staticmethod
+    def __body_block(body: str, one_line=False) -> str:
         if one_line:
             return "\n{ " + body + " }\n"
         else:
