@@ -1,7 +1,4 @@
-import ast
-
 from src.frontend.translator_dafny import TranslatorDafny
 
-f = open("tests/ioa/AsyncLCR.ioa.py").read()
-tree = ast.parse(f)
-print(TranslatorDafny().visit(tree))
+translator = TranslatorDafny("tests/ioa/AsyncLCR.ioa.py")
+print(translator.get_dafny_code())

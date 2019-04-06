@@ -7,7 +7,28 @@ from src.frontend.ioa_ast_visitor import IOAAstVisitor
 from src.frontend.ioa_constructs import IOA
 
 
-class TranslatorDafny(IOAAstVisitor):
+class TranslatorDafny:
+    def __init__(self, ioa_file_name):
+        self.__ioa_file_name = ioa_file_name
+        self.__dfy_code = None
+
+    def get_dafny_code(self) -> str:
+        if self.__dfy_code:
+            return self.__dfy_code
+
+        with open(self.__ioa_file_name) as f:
+            ioa_code = f.read()
+            # TODO is there a better way to make sure the ioa_code
+            #  is the same across all passes
+            prelude = "include \"Prelude.s.dfy\""
+            tree = ast.parse(ioa_code)
+            sym_tab = symtable.symtable(ioa_code, self.__ioa_file_name, 'exec')
+            dfy_code = _ToDafnyVisitor(sym_tab).visit(tree)
+        self.__dfy_code = prelude + dfy_code
+        return self.__dfy_code
+
+
+class _ToDafnyVisitor(IOAAstVisitor):
     ioa2dfy = {"Char": "char",
                "Int": "int",
                "Nat": "nat",
@@ -30,7 +51,7 @@ class TranslatorDafny(IOAAstVisitor):
             # FIXME Use another visitor to initialize namespaces
             assert sym_tab.get_type() == "module"
             self.__system = \
-                set(TranslatorDafny.ioa2dfy.keys()) \
+                set(_ToDafnyVisitor.ioa2dfy.keys()) \
                 | set(sym_tab.get_identifiers()) | set([e.value for e in IOA])
 
             self.__parameters = {}
@@ -424,7 +445,10 @@ class TranslatorDafny(IOAAstVisitor):
 
     def visit_TypeDef(self, lhs: ast.expr, rhs: ast.expr) -> str:
         assert isinstance(lhs, ast.Name)
-        return "type " + self.visit(lhs) + " = " + "TYPE_CONSTRUCTOR"  # TODO  self.visit(rhs)
+        return "type " + self.visit(lhs) + " = " + self.visit(rhs)
+
+    def visit_Shorthand(self, typ: ast.Call):
+        return ""
 
     def visit_Composition(self, comp: ast.FunctionDef) -> str:
         return self.__automaton_module(comp)
