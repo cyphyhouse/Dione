@@ -1,4 +1,5 @@
 from src.frontend.translator_dafny import TranslatorDafny
 
-translator = TranslatorDafny("tests/ioa/AsyncLCR.ioa.py")
-print(translator.get_dafny_code())
+with open("tests/ioa/AsyncLCR.ioa.py") as file:
+    translator = TranslatorDafny(file)
+    print(translator.get_dafny_code())
