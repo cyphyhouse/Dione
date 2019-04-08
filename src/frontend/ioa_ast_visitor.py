@@ -337,11 +337,11 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     def visit_StmtPass(self, stmt: ast.Pass):
         pass
 
-    def visit_Shorthand(self, typ):
+    def visit_Shorthand(self, typ: ast.Call):
         """ Shorthand is to build new types via enumeration, tuple, or union.
             See IOA manual Section 23
         """
-        raise NotImplementedError("Shorthand types are not supported yet.")
+        pass
 
     def visit_ExternalCall(self, call: ast.Call):
         pass
