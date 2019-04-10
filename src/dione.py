@@ -10,9 +10,14 @@ from src.frontend.translator_dafny import TranslatorDafny
 from src.verification_engine.prover_dafny import ProverDafny
 
 
-async def prove(dfy_exe, dfy_code):
+async def run(options):
+    # FIXME Is it possible to spin up dafny-server subprocess and
+    #  translate IOA code concurrently?
+    dfy_exe = options.dafny_server
+    dfy_code = TranslatorDafny(options.ioa).get_dafny_code()
     async with ProverDafny(dfy_exe) as prover:  # This creates a new process
-        print(await prover.verify(dfy_code))
+        # TODO Specify pattern to prove invariant proof only
+        print(await prover.verify(dfy_code, ["-proc:*invariant*of*"]))
 
 
 def main(args=None):
@@ -23,13 +28,10 @@ def main(args=None):
 
     options = parse_options(args)
 
-    dfy_exe = options.dafny_server
-    dfy_code = TranslatorDafny(options.ioa).get_dafny_code()
-
     if sys.platform == 'win32':
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-    asyncio.run(prove(dfy_exe, dfy_code))
+    asyncio.run(run(options))
 
 
 def parse_options(args):
