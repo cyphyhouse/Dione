@@ -59,8 +59,8 @@ class ProverDafny(ProverInterface):
 
         return ret.decode('ascii')
 
-    async def verify(self, code):
-        return await self.__run_task('verify', code)
+    async def verify(self, code, args=None):
+        return await self.__run_task('verify', code, args)
 
-    async def counter_example(self, code):
-        return await self.__run_task('counterExample', code)
+    async def counter_example(self, code, args=None):
+        return await self.__run_task('counterExample', code, args)
