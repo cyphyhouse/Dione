@@ -9,9 +9,13 @@ from src.frontend.ioa_constructs import IOA
 
 
 class TranslatorDafny:
-    def __init__(self, ioa_file: io.StringIO):
+    def __init__(self, ioa_file: io.StringIO, k=3):
+        if k < 0:
+            raise ValueError("Steps for invariant proof must be non-negative.")
+
         self.__ioa_file = ioa_file
         self.__dfy_code = None
+        self.__k_steps = k
 
     def get_dafny_code(self) -> str:
         if self.__dfy_code:
@@ -151,7 +155,10 @@ class _ToDafnyVisitor(IOAAstVisitor):
         )
         return "module " + aut.name + self.__body_block("\n".join(body_list))
 
-    def __func_name_args(self, construct, name=None, type_hint=True):
+    def __func_name_args(
+            self, construct, name=None, type_hint=True,
+            curr_s="s", act="act", next_s="s'", para="para"
+    ):
         if construct not in [
                 IOA.WHERE,
                 IOA.EFF, IOA.PRE, IOA.TRANSITIONS,
@@ -161,22 +168,24 @@ class _ToDafnyVisitor(IOAAstVisitor):
         if not name:
             if construct in [IOA.PRE, IOA.EFF]:
                 raise RuntimeError("Function name is required for precondition or effect")
-            # else:
-            name = str(construct)
+            elif construct == IOA.WHERE:  # Avoid Dafny keyword "where"
+                name = "automaton_where"
+            else:
+                name = str(construct)
 
         arg_list = []
         if construct in [IOA.EFF, IOA.PRE,
                          IOA.INITIALLY, IOA.INVARIANT_OF,
                          IOA.TRANSITIONS]:
-            arg_list.append("s: State" if type_hint else "s")
+            arg_list.append(curr_s + (": State" if type_hint else ""))
         if construct in [IOA.EFF, IOA.PRE,
                          IOA.INPUT, IOA.OUTPUT, IOA.INTERNAL, IOA.SIGNATURE,
                          IOA.TRANSITIONS]:
-            arg_list.append("act: Action" if type_hint else "act")
+            arg_list.append(act + (": Action" if type_hint else ""))
         if construct in [IOA.TRANSITIONS]:
-            arg_list.append("s': State" if type_hint else "s'")
+            arg_list.append(next_s + (": State" if type_hint else ""))
         if self.__parameters:
-            arg_list.append("para: Parameter" if type_hint else "para")
+            arg_list.append(para + (": Parameter" if type_hint else ""))
 
         func_name_args = name + "(" + ", ".join(arg_list) + ")"
         if not type_hint:
@@ -195,6 +204,37 @@ class _ToDafnyVisitor(IOAAstVisitor):
             return "\n{ " + body + " }\n"
         else:
             return " {\n" + body + "\n}\n"
+
+    def __lemma_bmc(self) -> str:
+        k = 3  # TODO pass k as an argument
+        arg_list = \
+            ["s"+str(i) + ": State" for i in range(0, k)] + \
+            ["a"+str(i) + ": Action" for i in range(1, k)]
+        if self.__parameters:
+            arg_list.append("para: Parameter")
+
+        ret_list = ["lemma bmc_invariant_of(" + ", ".join(arg_list) + ")"]
+        if self.__parameters:  # FIXME What if `where` clause is not specified
+            ret_list.append("requires " +
+                            self.__func_name_args(IOA.WHERE, type_hint=False))
+        ret_list.append(
+            "requires " +
+            self.__func_name_args(IOA.INITIALLY, type_hint=False, curr_s="s0")
+        )
+        ret_list += [
+            "requires " +
+            self.__func_name_args(
+                IOA.TRANSITIONS, type_hint=False,
+                curr_s="s"+str(i-1), act="a"+str(i), next_s="s"+str(i))
+            for i in range(1, k)
+        ] + [
+            "ensures " +
+            self.__func_name_args(
+                IOA.INVARIANT_OF, type_hint=False, curr_s="s" + str(i))
+            for i in range(0, k)
+        ]
+        return "\n".join(ret_list) + self.__body_block("", True)
+
 
     # region Python expression visitors
     def visit_BoolOp(self, exp) -> str:
@@ -437,8 +477,10 @@ class _ToDafnyVisitor(IOAAstVisitor):
         ret += "module Types {\n" \
                "newtype UID = u: nat| 0 <= u < 3\n" \
                "datatype Status = UNKNOWN | CHOSEN | REPORTED\n" \
-               "datatype Action = from0to1(v: UID) | from2to0(v:UID) | leader_0\n" \
-               "function max(a: UID, b: UID, c: UID): UID { a }\n" \
+               "datatype Action = from0to1(v: UID) | from1to2(v: UID) | from2to0(v:UID) |" \
+               " leader_0 | leader_1 | leader_2 \n" \
+               "function max(a: UID, b: UID, c: UID): UID { " \
+               "var tmp := if a >= b then a else b; if tmp >= c then tmp else c }\n" \
                "predicate implies(p: bool, q: bool){p ==> q}\n" \
                "}\n"
         return ret
@@ -455,7 +497,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         return self.__automaton_module(comp)
 
     def visit_AutomatonWhere(self, cond: ast.expr):
-        return self.__func_name_args(IOA.WHERE, "automaton_where") + \
+        return self.__func_name_args(IOA.WHERE) + \
                self.__body_block(self.visit(cond), True)
 
     def visit_ComponentList(self, comps: ast.ClassDef) -> str:
@@ -653,8 +695,11 @@ class _ToDafnyVisitor(IOAAstVisitor):
                self.__body_block(self.visit(cond), True)
 
     def visit_Invariant(self, cond: ast.expr) -> str:
-        return self.__func_name_args(IOA.INVARIANT_OF) + \
-               self.__body_block(self.visit(cond), True)
+        inv_pred = self.__func_name_args(IOA.INVARIANT_OF) + \
+            self.__body_block(self.visit(cond), True)
+        inv_lemma_bmc = self.__lemma_bmc()
+        inv_lemma_ind = ""
+        return inv_pred + inv_lemma_bmc + inv_lemma_ind
 
     def visit_ActionWhere(self, cond: ast.expr) -> str:
         return self.visit(cond)
