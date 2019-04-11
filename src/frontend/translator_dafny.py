@@ -470,20 +470,25 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
     # region IOA specific language constructs visitors
     def visit_IOASpec(self, spec: ast.Module) -> str:
-        ret = ""
-        for stmt in spec.body:
-            ret += self.visit(stmt) + "\n"
+        ret_list = list(map(self.visit, spec.body))
+
         # TODO Group type definitions together and create a module for types
-        ret += "module Types {\n" \
-               "newtype UID = u: nat| 0 <= u < 3\n" \
-               "datatype Status = UNKNOWN | CHOSEN | REPORTED\n" \
-               "datatype Action = from0to1(v: UID) | from1to2(v: UID) | from2to0(v:UID) |" \
-               " leader_0 | leader_1 | leader_2 \n" \
-               "function max(a: UID, b: UID, c: UID): UID { " \
-               "var tmp := if a >= b then a else b; if tmp >= c then tmp else c }\n" \
-               "predicate implies(p: bool, q: bool){p ==> q}\n" \
-               "}\n"
-        return ret
+        action_type = "datatype Action = " + \
+            " | ".join(self.__global_signature.values())
+
+        type_def_list = [
+            "newtype UID = u: nat| 0 <= u < 3",
+            "datatype Status = UNKNOWN | CHOSEN | REPORTED",
+            action_type,
+            "function max(a: UID, b: UID, c: UID): UID"
+            "{ var tmp := if a >= b then a else b; if tmp >= c then tmp else c }",
+            "predicate implies(p: bool, q: bool){p ==> q}"
+        ]
+
+        mod_types = "module Types" + \
+            self.__body_block("\n".join(type_def_list))
+
+        return mod_types + "\n".join(ret_list)
 
     def visit_TypeDef(self, lhs: ast.expr, rhs: ast.expr) -> str:
         assert isinstance(lhs, ast.Name)
@@ -606,7 +611,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         pred_dict = {"input": "false",
                      "output": "false",
                      "internal": "false"}
-        for name, (sig, typ, where) in act_list:
+        for name, (_, typ, where) in act_list:
             pred = "act." + name + "?"
             if where:
                 pred += "&&" + where
