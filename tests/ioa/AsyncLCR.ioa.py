@@ -17,7 +17,7 @@ def Sys(u0: UID, u1: UID, u2: UID):
     )
 
 @automaton
-def AsyncLCR0(u0: UID):
+def AsyncLCR0(u: UID):
 
     class signature:
         @output
@@ -30,7 +30,7 @@ def AsyncLCR0(u0: UID):
     class states:
         q: Seq[UID]
         status: Status
-    initially = q == [u0] and status == UNKNOWN
+    initially = q == [u] and status == UNKNOWN
 
     class transitions:
         @output
@@ -40,12 +40,81 @@ def AsyncLCR0(u0: UID):
 
         @input
         def from2to0(v):
-            if v > u0:
+            if v > u:
                 q = q + [v]
-            elif v == u0:
+            elif v == u:
                 status = CHOSEN
 
         @output
         @pre(status == CHOSEN)
         def leader_0():
+            status = REPORTED
+
+@automaton
+def AsyncLCR1(u: UID):
+
+    class signature:
+        @output
+        def from1to2(v: UID): pass
+        @input
+        def from0to1(v: UID): pass
+        @output
+        def leader_1(): pass
+
+    class states:
+        q: Seq[UID]
+        status: Status
+    initially = q == [u] and status == UNKNOWN
+
+    class transitions:
+        @output
+        @pre(q != [] and v == q[0])
+        def from1to2(v):
+            q = q[1:]
+
+        @input
+        def from0to1(v):
+            if v > u:
+                q = q + [v]
+            elif v == u:
+                status = CHOSEN
+
+        @output
+        @pre(status == CHOSEN)
+        def leader_1():
+            status = REPORTED
+
+
+@automaton
+def AsyncLCR2(u: UID):
+
+    class signature:
+        @output
+        def from2to0(v: UID): pass
+        @input
+        def from1to2(v: UID): pass
+        @output
+        def leader_2(): pass
+
+    class states:
+        q: Seq[UID]
+        status: Status
+    initially = q == [u] and status == UNKNOWN
+
+    class transitions:
+        @output
+        @pre(q != [] and v == q[0])
+        def from2to0(v):
+            q = q[1:]
+
+        @input
+        def from1to2(v):
+            if v > u:
+                q = q + [v]
+            elif v == u:
+                status = CHOSEN
+
+        @output
+        @pre(status == CHOSEN)
+        def leader_2():
             status = REPORTED
