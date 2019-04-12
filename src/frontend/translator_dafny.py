@@ -132,6 +132,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         self.__parameters = None
         self.__global_signature = {}
         self.__current_namespace = self.__IOANamespace(sym_tab)
+        self.__shorthand_count = 0
 
     def __automaton_module(self, aut: ast.FunctionDef) -> str:
         body_list = ["import opened Types"]  # Import type definitions
@@ -353,8 +354,8 @@ class _ToDafnyVisitor(IOAAstVisitor):
     def visit_List(self, exp) -> str:
         return "[" + ", ".join(map(self.visit, exp.elts)) + "]"
 
-    def visit_Tuple(self, exp):
-        raise NotImplementedError
+    def visit_Tuple(self, exp) -> str:
+        return "(" + ", ".join(map(self.visit, exp.elts)) + ")"
 
     def visit_Slice(self, slc):
         ret = ""
@@ -470,15 +471,21 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
     # region IOA specific language constructs visitors
     def visit_IOASpec(self, spec: ast.Module) -> str:
-        ret_list = list(map(self.visit, spec.body))
+        stmt_list = list(map(self.visit, spec.body))
+
+        type_def_list, rem_list = [], []
+        for s in stmt_list:
+            # FIXME using prefix of returned string feels unsafe
+            if s.startswith("type"):
+                type_def_list.append(s)
+            else:
+                rem_list.append(s)
 
         # TODO Group type definitions together and create a module for types
         action_type = "datatype Action = " + \
             " | ".join(self.__global_signature.values())
 
-        type_def_list = [
-            "newtype UID = u: nat| 0 <= u < 3",
-            "datatype Status = UNKNOWN | CHOSEN | REPORTED",
+        type_def_list += [
             action_type,
             "function max(a: UID, b: UID, c: UID): UID"
             "{ var tmp := if a >= b then a else b; if tmp >= c then tmp else c }",
@@ -488,15 +495,32 @@ class _ToDafnyVisitor(IOAAstVisitor):
         mod_types = "module Types" + \
             self.__body_block("\n".join(type_def_list))
 
-        return mod_types + "\n".join(ret_list)
+        return mod_types + "\n".join(rem_list)
 
     def visit_TypeDef(self, lhs: ast.expr, rhs: ast.expr) -> str:
         assert isinstance(lhs, ast.Name)
         # TODO translate type definitions
-        return ""  # ""type " + self.visit(lhs) + " = " + self.visit(rhs)
+        typ_name = self.visit(lhs)
+        return "type " + typ_name + " = " + self.visit(rhs)
 
-    def visit_Shorthand(self, typ: ast.Call):
-        return ""
+    def visit_Shorthand(self, typ: ast.Call) -> str:
+        assert isinstance(typ.func, ast.Name)
+        assert not typ.keywords
+        assert all(isinstance(arg, ast.Name) for arg in typ.args) \
+            or all(isinstance(arg, ast.Num) for arg in typ.args)
+
+        cons = self.visit(typ.func)
+        arg_list = list(map(self.visit, typ.args))
+        self.__shorthand_count += 1
+        name = "shorthand'" + str(self.__shorthand_count)
+        shorthand = {
+            "Enum":
+                "datatype " + name + " = " + " | ".join(arg_list),
+            "IntEnum":
+                "newtype " + name + " = n: int | " +
+                "||".join(map(lambda v: "n==" + v, arg_list)),
+        }
+        return name + '\n' + shorthand[cons]
 
     def visit_Composition(self, comp: ast.FunctionDef) -> str:
         return self.__automaton_module(comp)
