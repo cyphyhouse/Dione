@@ -9,9 +9,9 @@ from src.frontend.ioa_constructs import IOA
 
 
 class TranslatorDafny:
-    def __init__(self, ioa_file: io.StringIO, k=3):
-        if k < 0:
-            raise ValueError("Steps for invariant proof must be non-negative.")
+    def __init__(self, ioa_file: io.StringIO, k=1):
+        if k <= 0:
+            raise ValueError("Steps for invariant proof must be positive.")
 
         self.__ioa_file = ioa_file
         self.__dfy_code = None
@@ -27,7 +27,7 @@ class TranslatorDafny:
         prelude = ""  # TODO ""include \"Prelude.s.dfy\"\n"
         tree = ast.parse(ioa_code)
         sym_tab = symtable.symtable(ioa_code, self.__ioa_file.name, 'exec')
-        dfy_code = _ToDafnyVisitor(sym_tab).visit(tree)
+        dfy_code = _ToDafnyVisitor(sym_tab, self.__k_steps).visit(tree)
         self.__dfy_code = prelude + dfy_code
         return self.__dfy_code
 
@@ -127,8 +127,10 @@ class _ToDafnyVisitor(IOAAstVisitor):
             # else:
             raise RuntimeError("Unexpected identifier \"" + identifier + "\"")
 
-    def __init__(self, sym_tab: symtable.SymbolTable):
+    def __init__(self, sym_tab: symtable.SymbolTable, k: int):
+        assert k > 0
         super().__init__()
+        self.__k_steps = k
         self.__parameters = None
         self.__global_signature = {}
         self.__current_namespace = self.__IOANamespace(sym_tab)
@@ -207,7 +209,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
             return " {\n" + body + "\n}\n"
 
     def __lemma_bmc(self) -> str:
-        k = 3  # TODO pass k as an argument
+        k = self.__k_steps
         arg_list = \
             ["s"+str(i) + ": State" for i in range(0, k)] + \
             ["a"+str(i) + ": Action" for i in range(1, k)]
@@ -226,8 +228,8 @@ class _ToDafnyVisitor(IOAAstVisitor):
             "requires " +
             self.__func_name_args(
                 IOA.TRANSITIONS, type_hint=False,
-                curr_s="s"+str(i-1), act="a"+str(i), next_s="s"+str(i))
-            for i in range(1, k)
+                curr_s="s"+str(i), act="a"+str(i+1), next_s="s"+str(i+1))
+            for i in range(0, k-1)
         ] + [
             "ensures " +
             self.__func_name_args(
@@ -236,6 +238,34 @@ class _ToDafnyVisitor(IOAAstVisitor):
         ]
         return "\n".join(ret_list) + self.__body_block("", True)
 
+    def __lemma_induction(self) -> str:
+        k = self.__k_steps
+        arg_list = \
+            ["s"+str(i) + ": State" for i in range(0, k+1)] + \
+            ["a"+str(i+1) + ": Action" for i in range(0, k+1)]
+        if self.__parameters:
+            arg_list.append("para: Parameter")
+
+        ret_list = ["lemma induction_invariant_of(" + ", ".join(arg_list) + ")"]
+        if self.__parameters:  # FIXME What if `where` clause is not specified
+            ret_list.append("requires " +
+                            self.__func_name_args(IOA.WHERE, type_hint=False))
+        ret_list += [
+            "requires " +
+            self.__func_name_args(
+                IOA.INVARIANT_OF, type_hint=False, curr_s="s" + str(i)) + '\n'
+            "requires " +
+            self.__func_name_args(
+                IOA.TRANSITIONS, type_hint=False,
+                curr_s="s"+str(i), act="a"+str(i+1), next_s="s"+str(i+1))
+            for i in range(0, k)
+        ]
+        ret_list.append(
+            "ensures " +
+            self.__func_name_args(
+                IOA.INVARIANT_OF, type_hint=False, curr_s="s" + str(k))
+        )
+        return "\n".join(ret_list) + self.__body_block("", True)
 
     # region Python expression visitors
     def visit_BoolOp(self, exp) -> str:
@@ -727,7 +757,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         inv_pred = self.__func_name_args(IOA.INVARIANT_OF) + \
             self.__body_block(self.visit(cond), True)
         inv_lemma_bmc = self.__lemma_bmc()
-        inv_lemma_ind = ""
+        inv_lemma_ind = self.__lemma_induction()
         return inv_pred + inv_lemma_bmc + inv_lemma_ind
 
     def visit_ActionWhere(self, cond: ast.expr) -> str:
