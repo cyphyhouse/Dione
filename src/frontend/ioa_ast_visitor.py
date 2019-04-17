@@ -22,6 +22,28 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     def _get_scope(self):
         return self.__scope
 
+    # region Top level Python AST node types
+    def visit_Module(self, mod):
+        """ Visit parsed AST from ast.parse in 'exec' mode """
+        with IOAScopeHandler(self.__scope, IOA.IOA_SPEC):
+            return self.visit_IOASpec(mod)
+
+    def visit_Interactive(self, node):
+        """ Visit parsed AST from ast.parse in 'single' mode
+            This is can be used to test a single statement in eff
+        """
+        with IOAScopeHandler(self.__scope, IOA.EFF):
+            return self.visit(node.body)
+
+    def visit_Expression(self, node):
+        """ Visit parsed AST from ast.parse in 'single' mode
+            This is can be used to test a single expression in eff
+        """
+        with IOAScopeHandler(self.__scope, IOA.EFF):
+            return self.visit(node.expr)
+
+    # endregion
+
     # region Python language constructs
     def visit_AnnAssign(self, node):
         """ Variable annotated with type hints and followed by an optional assigned value. """
@@ -52,10 +74,12 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         if len(node.targets) > 1:
             # TODO allow multiple assignment?
             raise NotImplementedError("Multiple assignment is not supported yet.")
-        if not isinstance(node.targets[0], ast.Name):
-            # TODO Allow subscription expressions (e.g., sequence, map, etc.) or member access
-            raise NotImplementedError("Left-hand side must be an identifier for now.")
+        if self.__scope == IOA.EFF:
+            return self.visit_StmtAssign(node.targets[0], node.value)
 
+        if not isinstance(node.targets[0], ast.Name):
+            raise NotImplementedError(
+                "Left-hand side must be an identifier except in eff block.")
         lhs_str = node.targets[0].id
         if self.__scope == IOA.AUTOMATON:
             if lhs_str == str(IOA.INITIALLY):
@@ -78,8 +102,6 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             if lhs_str == str(IOA.WHERE):
                 with IOAScopeHandler(self.__scope, IOA.WHERE):
                     return self.visit_ActionWhere(node.value)
-        if self.__scope == IOA.EFF:
-            return self.visit_StmtAssign(node.targets[0], node.value)
         # else:
         if self.__scope == IOA.STATES:
             raise ValueError("Type of \"" + lhs_str +
@@ -178,10 +200,6 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     def visit_If(self, stmt):
         return self.visit_StmtIf(stmt)
 
-    def visit_Module(self, mod):
-        with IOAScopeHandler(self.__scope, IOA.IOA_SPEC):
-            return self.visit_IOASpec(mod)
-
     def visit_Name(self, name):
         construct = IOA.get(name.id, None)
         # Check if name is a not reserved word
@@ -195,6 +213,10 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             raise ValueError("Unexpected action type \"" + name.id + "\"")
         # else:
         raise ValueError("Reserved word \"" + name.id + "\" is used as an identifier")
+
+    def visit_Expr(self, stmt):
+        """ Expression as a statement"""
+        return self.visit(stmt.value)
 
     def visit_Pass(self, stmt):
         return self.visit_StmtPass(stmt)
