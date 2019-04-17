@@ -46,7 +46,9 @@ class _ToDafnyVisitor(IOAAstVisitor):
                "implies": "implies",  # TODO Use built-in operators
                "explies": "explies",
                "disjoint": "disjoint",
-               "max": "max"
+               "max": "max",
+               "len": "len",
+               "range": "range",
                # Are there more built-in types to translate?
                }
 
@@ -134,7 +136,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         self.__parameters = None
         self.__global_signature = {}
         self.__current_namespace = self.__IOANamespace(sym_tab)
-        self.__shorthand_count = 0
+        self.__tmp_id_count = 0
 
     def __automaton_module(self, aut: ast.FunctionDef) -> str:
         body_list = ["import opened Types"]  # Import type definitions
@@ -322,13 +324,15 @@ class _ToDafnyVisitor(IOAAstVisitor):
         ret += ")"
         return ret
 
-    def visit_Call(self, exp):
+    def visit_Call(self, exp) -> str:
         return super().visit_Call(exp)
 
-    def visit_Num(self, exp):
+    def visit_Num(self, exp) -> str:
         return str(exp.n)
 
-    def visit_Str(self, exp):
+    def visit_Str(self, exp) -> str:
+        if self._get_scope() == IOA.IOA_SPEC:
+            return "/*" + exp.s + "*/"
         raise NotImplementedError
 
     def visit_FormattedValue(self, exp):
@@ -354,7 +358,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
     def visit_Constant(self, exp):
         raise NotImplementedError
 
-    def visit_Attribute(self, exp):
+    def visit_Attribute(self, exp) -> str:
         # Special case: printing 3.__abs__() is a syntax error,
         # so if t.value is an integer literal then we need to parenthesize it
         # to get (3).__abs__().
@@ -370,8 +374,17 @@ class _ToDafnyVisitor(IOAAstVisitor):
         #  call visit_GenericType() or visit_ExprSubscript() based on cases
         if self._get_scope() in \
                 [IOA.TYPE_DEF, IOA.FORMAL_PARA, IOA.DECL_VAR]:
+            assert not isinstance(exp.ctx, ast.Store) \
+                and not isinstance(exp.ctx, ast.AugStore)
             # Angle brackets are used for parametrized type in Dafny
             return self.visit(exp.value) + "<" + self.visit(exp.slice) + ">"
+
+        if isinstance(exp.ctx, ast.Store) or \
+                isinstance(exp.ctx, ast.AugStore):
+            assert isinstance(exp.value, ast.Name)
+            raise RuntimeError(
+                "Subscript expression as L-value should've been handled by"
+                "visit_StmtAssign")
         # else:
         return self.visit(exp.value) + "[" + self.visit(exp.slice) + "]"
 
@@ -492,10 +505,10 @@ class _ToDafnyVisitor(IOAAstVisitor):
         raise RuntimeError("\"is not\" operator will not be supported")
 
     def visit_In(self, _) -> str:
-        return "in"
+        return " in "
 
     def visit_NotIn(self, _) -> str:
-        return "!in"
+        return " !in "
 
     # endregion
 
@@ -517,9 +530,11 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
         type_def_list += [
             action_type,
-            "function max(a: UID, b: UID, c: UID): UID"
-            "{ var tmp := if a >= b then a else b; if tmp >= c then tmp else c }",
-            "predicate implies(p: bool, q: bool){p ==> q}"
+            # TODO move these functions to a prelude file
+            #"function max(a: UID, b: UID, c: UID): UID"
+            #"{ var tmp := if a >= b then a else b; if tmp >= c then tmp else c }",
+            "predicate implies(p: bool, q: bool){p ==> q}",
+            "function len<T>(arr: seq<T>): nat{ |arr| }"
         ]
 
         mod_types = "module Types" + \
@@ -541,8 +556,8 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
         cons = self.visit(typ.func)
         arg_list = list(map(self.visit, typ.args))
-        self.__shorthand_count += 1
-        name = "shorthand'" + str(self.__shorthand_count)
+        name = "shorthand'" + str(self.__tmp_id_count)
+        self.__tmp_id_count += 1
         shorthand = {
             "Enum":
                 "datatype " + name + " = " + " | ".join(arg_list),
@@ -703,7 +718,9 @@ class _ToDafnyVisitor(IOAAstVisitor):
     def visit_TransitionList(self, tran_list: ast.ClassDef) -> str:
         # TODO different names to allow multiple (pre, eff) for the same action
         def _gen_name(act):
-            return "pre_" + act, "eff_" + act
+            suffix = "'" + str(self.__tmp_id_count) + "_" + act
+            self.__tmp_id_count += 1
+            return "pre" + suffix, "eff" + suffix
 
         # FIXME This assumes a different return type than str
         tran_iter = map(self.visit, tran_list.body)
@@ -764,10 +781,18 @@ class _ToDafnyVisitor(IOAAstVisitor):
         return self.visit(cond)
 
     def visit_StmtAssign(self, lhs: ast.expr, rhs: ast.expr) -> str:
-        # TODO handle rhs differently to get state and parameter variables accordingly
-        return "s.(" + \
-               self.visit(lhs) + " := " + self.visit(rhs) + \
-               ")"
+        assert lhs.ctx and isinstance(lhs.ctx, ast.Store)
+        # TODO deal with assignment to sequence elements
+        if isinstance(lhs, ast.Name):
+            return "s.(" + \
+                self.visit(lhs) + " := " + self.visit(rhs) + ")"
+        if isinstance(lhs, ast.Subscript):
+            assert isinstance(lhs.ctx, ast.Store) or \
+                isinstance(lhs.ctx, ast.AugStore)
+            assert isinstance(lhs.value, ast.Name)
+            return "s.(" + lhs.value.id + ":=" + self.visit(lhs.value) + "[" + \
+                self.visit(lhs.slice) + " := " + self.visit(rhs) + "])"
+        raise NotImplementedError
 
     def visit_StmtIf(self, stmt: ast.If) -> str:
         return "if " + self.visit(stmt.test) + "\n" + \
@@ -782,7 +807,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
     def visit_Identifier(self, name: ast.Name) -> str:
         # FIXME We can also do this case split in IOAAstVisitor, for example,
-        #  call visit_LValue() or visit_EValue() based on cases
+        #  call visit_LValue() or visit_RValue() based on cases
         # A parameter declaration or L-values in an assignment
         if isinstance(name.ctx, ast.Param) or \
                 isinstance(name.ctx, ast.Store) or \
