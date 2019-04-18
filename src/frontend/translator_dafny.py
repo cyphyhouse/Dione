@@ -1,5 +1,6 @@
 """ Translator from IOA to Dafny proof assistant """
 import ast
+from collections import namedtuple
 import io
 import symtable
 from typing import List, Optional, Tuple
@@ -27,9 +28,77 @@ class TranslatorDafny:
         prelude = ""  # TODO ""include \"Prelude.s.dfy\"\n"
         tree = ast.parse(ioa_code)
         sym_tab = symtable.symtable(ioa_code, self.__ioa_file.name, 'exec')
-        dfy_code = _ToDafnyVisitor(sym_tab, self.__k_steps).visit(tree)
+        ns = _IOANamespace(sym_tab)
+        dfy_code = _ToDafnyVisitor(ns, self.__k_steps).visit(tree)
         self.__dfy_code = prelude + dfy_code
         return self.__dfy_code
+
+
+class _IOANamespace:
+    AutNamespace = namedtuple('AutNamespace', ['parameters', 'states',
+                                               'act_formals', 'locals'])
+
+    def __init__(self, sym_tab: symtable.SymbolTable):
+        # FIXME Use another visitor to initialize namespaces
+        assert sym_tab.get_type() == "module"
+        self.__system = \
+            set(_ToDafnyVisitor.ioa2dfy.keys()) \
+            | set(sym_tab.get_identifiers()) | set([e.value for e in IOA])
+
+        self.__automaton = {}
+        for aut_sym in sym_tab.get_children():
+            # Collect automaton parameters
+            assert isinstance(aut_sym, symtable.Function)
+            aut_name = aut_sym.get_name()
+            assert self.__system.isdisjoint(set(aut_sym.get_parameters()))
+            parameters = set(aut_sym.get_parameters())
+
+            # Collect state variables
+            if str(IOA.STATES) in aut_sym.get_identifiers():
+                states_sym = aut_sym.lookup(str(IOA.STATES)).get_namespace()
+            elif str(IOA.COMPONENTS) in aut_sym.get_identifiers():
+                states_sym = aut_sym.lookup(str(IOA.COMPONENTS)).get_namespace()
+            elif False:  # TODO support simulation relations
+                pass
+            else:
+                raise RuntimeError("Cannot find either states or components")
+            states = \
+                set(states_sym.get_identifiers()) \
+                - parameters - self.__system
+
+            self.__automaton[aut_name] = self.AutNamespace(parameters, states, {}, {})
+
+            if str(IOA.SIGNATURE) not in aut_sym.get_identifiers():
+                continue
+            # Collect all parameterized actions
+            act_formals = self.__automaton[aut_name].act_formals
+            sig_sym = aut_sym.lookup(str(IOA.SIGNATURE)).get_namespace()
+            for act_sym in sig_sym.get_children():
+                assert isinstance(act_sym, symtable.Function)
+                act_name = act_sym.get_name()
+                assert set(act_sym.get_parameters()).isdisjoint(self.__system)
+                assert set(act_sym.get_parameters()).isdisjoint(parameters)
+
+                if not act_formals.get(act_name, None):
+                    act_formals[act_name] = set(act_sym.get_parameters())
+                assert act_formals[act_name] == set(act_sym.get_parameters())
+
+    def add_namespace(self, identifier: str) -> str:
+        # FIXME check against a specific automaton and action instead of
+        #  all automaton and all actions
+        if identifier in self.__system:
+            return identifier
+
+        for parameters, states, act_formals, locals in self.__automaton.values():
+            if identifier in parameters:
+                return "para." + identifier
+            if identifier in states:
+                return "s." + identifier
+            for formals in act_formals.values():
+                if identifier in formals:
+                    return "act." + identifier
+        # else:
+        raise RuntimeError("Unexpected identifier \"" + identifier + "\"")
 
 
 class _ToDafnyVisitor(IOAAstVisitor):
@@ -52,90 +121,13 @@ class _ToDafnyVisitor(IOAAstVisitor):
                # Are there more built-in types to translate?
                }
 
-    class __IOANamespace:
-        def __init__(self, sym_tab: symtable.SymbolTable):
-            # FIXME Use another visitor to initialize namespaces
-            assert sym_tab.get_type() == "module"
-            self.__system = \
-                set(_ToDafnyVisitor.ioa2dfy.keys()) \
-                | set(sym_tab.get_identifiers()) | set([e.value for e in IOA])
-
-            self.__parameters = {}
-            self.__states = {}
-            self.__act_formals = {}
-            for aut_sym in sym_tab.get_children():
-                # Collect automaton parameters
-                assert isinstance(aut_sym, symtable.Function)
-                aut_name = aut_sym.get_name()
-                assert self.system.isdisjoint(set(aut_sym.get_parameters()))
-                self.__parameters[aut_name] = set(aut_sym.get_parameters())
-
-                # Collect state variables
-                if str(IOA.STATES) in aut_sym.get_identifiers():
-                    states_sym = aut_sym.lookup(str(IOA.STATES)).get_namespace()
-                elif str(IOA.COMPONENTS) in aut_sym.get_identifiers():
-                    states_sym = aut_sym.lookup(str(IOA.COMPONENTS)).get_namespace()
-                else:
-                    # FIXME May through error for definitions of simulation relations
-                    raise RuntimeError("Cannot find either states or components")
-                self.__states[aut_name] = \
-                    set(states_sym.get_identifiers()) \
-                    - self.__parameters[aut_name] - self.__system
-
-                # Collect all parameterized actions
-                if str(IOA.SIGNATURE) not in aut_sym.get_identifiers():
-                    continue
-                sig_sym = aut_sym.lookup(str(IOA.SIGNATURE)).get_namespace()
-                for act_sym in sig_sym.get_children():
-                    assert isinstance(act_sym, symtable.Function)
-                    act_name = act_sym.get_name()
-                    assert set(act_sym.get_parameters()).isdisjoint(self.system)
-                    assert set(act_sym.get_parameters()).isdisjoint(self.parameters[aut_name])
-
-                    if not self.__act_formals.get(act_name, None):
-                        self.__act_formals[act_name] = set(act_sym.get_parameters())
-                    assert self.__act_formals[act_name] == set(act_sym.get_parameters())
-
-        @property
-        def act_formals(self):
-            return self.__act_formals
-
-        @property
-        def states(self):
-            return self.__states
-
-        @property
-        def parameters(self):
-            return self.__parameters
-
-        @property
-        def system(self):
-            return self.__system
-
-        def add_namespace(self, identifier: str) -> str:
-            # FIXME check against a specific automaton and action instead of
-            #  all automaton and all actions
-            if identifier in self.system:
-                return identifier
-            for parameters in self.parameters.values():
-                if identifier in parameters:
-                    return "para." + identifier
-            for states in self.states.values():
-                if identifier in states:
-                    return "s." + identifier
-            for act_formals in self.act_formals.values():
-                if identifier in act_formals:
-                    return "act." + identifier
-            # else:
-            raise RuntimeError("Unexpected identifier \"" + identifier + "\"")
-
-    def __init__(self, sym_tab: symtable.SymbolTable, k: int):
+    def __init__(self, ns: _IOANamespace, k: int):
         assert k > 0
         super().__init__()
         self.__k_steps = k
         self.__parameters = None
         self.__global_signature = {}
-        self.__current_namespace = self.__IOANamespace(sym_tab)
+        self._current_namespace = ns
         self.__tmp_id_count = 0
 
     def __automaton_module(self, aut: ast.FunctionDef) -> str:
@@ -268,6 +260,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
                 IOA.INVARIANT_OF, type_hint=False, curr_s="s" + str(k))
         )
         return "\n".join(ret_list) + self.__body_block("", True)
+
 
     # region Python expression visitors
     def visit_BoolOp(self, exp) -> str:
@@ -815,7 +808,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
             assert name.id not in self.ioa2dfy
             return name.id
         # else:  # R-value in assignment or type annotations
-        ret = self.__current_namespace.add_namespace(name.id)
+        ret = self._current_namespace.add_namespace(name.id)
         # FIXME do we need ioa2dfy mapping at all?
         return self.ioa2dfy.get(ret, ret)
 
