@@ -40,7 +40,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             This is can be used to test a single expression in eff
         """
         with IOAScopeHandler(self.__scope, IOA.EFF):
-            return self.visit(node.expr)
+            return self.visit(node.body)
 
     # endregion
 

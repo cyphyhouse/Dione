@@ -36,16 +36,18 @@ class TranslatorDafny:
 
 class _IOANamespace:
     AutNamespace = namedtuple('AutNamespace', ['parameters', 'states',
-                                               'act_formals', 'locals'])
+                                               'act_formals', 'local_vars'])
 
     def __init__(self, sym_tab: symtable.SymbolTable):
         # FIXME Use another visitor to initialize namespaces
         assert sym_tab.get_type() == "module"
+        self.__ns_stack = []
         self.__system = \
             set(_ToDafnyVisitor.ioa2dfy.keys()) \
             | set(sym_tab.get_identifiers()) | set([e.value for e in IOA])
 
         self.__automaton = {}
+        self.__act_formals = {}
         for aut_sym in sym_tab.get_children():
             # Collect automaton parameters
             assert isinstance(aut_sym, symtable.Function)
@@ -65,13 +67,11 @@ class _IOANamespace:
             states = \
                 set(states_sym.get_identifiers()) \
                 - parameters - self.__system
-
-            self.__automaton[aut_name] = self.AutNamespace(parameters, states, {}, {})
+            self.__automaton[aut_name] = (parameters, states)
 
             if str(IOA.SIGNATURE) not in aut_sym.get_identifiers():
                 continue
             # Collect all parameterized actions
-            act_formals = self.__automaton[aut_name].act_formals
             sig_sym = aut_sym.lookup(str(IOA.SIGNATURE)).get_namespace()
             for act_sym in sig_sym.get_children():
                 assert isinstance(act_sym, symtable.Function)
@@ -79,25 +79,66 @@ class _IOANamespace:
                 assert set(act_sym.get_parameters()).isdisjoint(self.__system)
                 assert set(act_sym.get_parameters()).isdisjoint(parameters)
 
-                if not act_formals.get(act_name, None):
-                    act_formals[act_name] = set(act_sym.get_parameters())
-                assert act_formals[act_name] == set(act_sym.get_parameters())
+                if not self.__act_formals.get(act_name, None):
+                    self.__act_formals[act_name] = set(act_sym.get_parameters())
+                assert self.__act_formals[act_name] == set(act_sym.get_parameters())
+
+    def __push(self, curr_ns):
+        self.__ns_stack.append(curr_ns)
+
+    def enter_automaton(self, aut_name: str):
+        parameters, states = self.__automaton[aut_name]
+        new_ns = self.AutNamespace(parameters, states, set(), set())
+        self.__push(new_ns)
+
+    def enter_formal_action(self, act_name: str):
+        assert self.__ns_stack
+        curr_ns = self.__ns_stack[-1]
+        act_formals = self.__act_formals[act_name]
+        new_ns = self.AutNamespace(curr_ns.parameters,
+                                   set(),  # states should not be used to declare actions
+                                   act_formals, set())
+        self.__push(new_ns)
+
+    def enter_transition(self, act_name: str):
+        assert self.__ns_stack
+        curr_ns = self.__ns_stack[-1]
+        act_formals = self.__act_formals[act_name]
+        new_ns = self.AutNamespace(curr_ns.parameters,
+                                   curr_ns.states,
+                                   act_formals, set())
+        self.__push(new_ns)
+
+    def enter_quantification(self, var_list: List[str]):
+        assert var_list
+        assert self.__ns_stack
+        curr_ns = self.__ns_stack[-1]
+        new_local_vars = curr_ns.local_vars.copy() | set(var_list)
+        new_ns = self.AutNamespace(curr_ns.parameters,
+                                   curr_ns.states,
+                                   curr_ns.act_formals,
+                                   new_local_vars)
+        self.__push(new_ns)
+
+    def exit(self):
+        assert self.__ns_stack
+        self.__ns_stack.pop()
 
     def add_namespace(self, identifier: str) -> str:
-        # FIXME check against a specific automaton and action instead of
-        #  all automaton and all actions
-        if identifier in self.__system:
-            return identifier
-
-        for parameters, states, act_formals, locals in self.__automaton.values():
-            if identifier in parameters:
-                return "para." + identifier
+        if self.__ns_stack:
+            curr_ns = self.__ns_stack[-1]
+            parameters, states, act_formals, local_vars = curr_ns
+            if identifier in local_vars:
+                return identifier
+            if identifier in act_formals:
+                return "act." + identifier
             if identifier in states:
                 return "s." + identifier
-            for formals in act_formals.values():
-                if identifier in formals:
-                    return "act." + identifier
+            if identifier in parameters:
+                return "para." + identifier
         # else:
+        if identifier in self.__system:
+            return identifier
         raise RuntimeError("Unexpected identifier \"" + identifier + "\"")
 
 
@@ -110,13 +151,8 @@ class _ToDafnyVisitor(IOAAstVisitor):
                "Map": "map",
                "Set": "set",
                "Mset": "multiset",
-               "forall": "forall",
-               "exists": "exists",
-               "implies": "implies",  # TODO Use built-in operators
-               "explies": "explies",
                "disjoint": "disjoint",
                "max": "max",
-               "len": "len",
                "range": "range",
                # Are there more built-in types to translate?
                }
@@ -236,7 +272,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         k = self.__k_steps
         arg_list = \
             ["s"+str(i) + ": State" for i in range(0, k+1)] + \
-            ["a"+str(i+1) + ": Action" for i in range(0, k+1)]
+            ["a"+str(i) + ": Action" for i in range(1, k+1)]
         if self.__parameters:
             arg_list.append("para: Parameter")
 
@@ -526,7 +562,6 @@ class _ToDafnyVisitor(IOAAstVisitor):
             # TODO move these functions to a prelude file
             #"function max(a: UID, b: UID, c: UID): UID"
             #"{ var tmp := if a >= b then a else b; if tmp >= c then tmp else c }",
-            "predicate implies(p: bool, q: bool){p ==> q}",
             "function len<T>(arr: seq<T>): nat{ |arr| }"
         ]
 
@@ -561,7 +596,13 @@ class _ToDafnyVisitor(IOAAstVisitor):
         return name + '\n' + shorthand[cons]
 
     def visit_Composition(self, comp: ast.FunctionDef) -> str:
-        return self.__automaton_module(comp)
+        # Set namespace for the given automaton
+        self._current_namespace.enter_automaton(comp.name)
+
+        result = self.__automaton_module(comp)
+        # Reset namespace
+        self._current_namespace.exit()
+        return result
 
     def visit_AutomatonWhere(self, cond: ast.expr):
         return self.__func_name_args(IOA.WHERE) + \
@@ -647,7 +688,13 @@ class _ToDafnyVisitor(IOAAstVisitor):
         return self.visit(aut_inst.func), ", ".join(map(self.visit, aut_inst.args))
 
     def visit_PrimitiveAutomaton(self, prim: ast.FunctionDef) -> str:
-        return self.__automaton_module(prim)
+        # Set namespace for the given automaton
+        self._current_namespace.enter_automaton(prim.name)
+
+        result = self.__automaton_module(prim)
+        # Reset namespace
+        self._current_namespace.exit()
+        return result
 
     def visit_FormalParameters(self, para_list: List[ast.arg]) -> str:
         if para_list:
@@ -686,13 +733,19 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
     def visit_FormalAction(self, act: ast.FunctionDef) \
             -> Tuple[str, Tuple[str, str, str]]:
+        # Set namespace
+        self._current_namespace.enter_formal_action(act.name)
+
         assert len(act.decorator_list) == 1
         act_typ = self.visit(act.decorator_list[0])
         act_sig = act.name + "(" + self.visit(act.args) + ")"
         assert len(act.body) == 1
         act_where = self.visit(act.body[0])
         # FIXME If possible, return a string like other functions
-        return act.name, (act_sig, act_typ, act_where)
+        result = act.name, (act_sig, act_typ, act_where)
+        # Reset namespace
+        self._current_namespace.exit()
+        return result
 
     def visit_States(self, states: ast.ClassDef) -> str:
         ret = "datatype State = State("
@@ -736,12 +789,19 @@ class _ToDafnyVisitor(IOAAstVisitor):
         return "\n".join(ret_list)
 
     def visit_Transition(self, tran: ast.FunctionDef) -> Tuple[str, Tuple[str, str]]:
+        # Set namespace
+        self._current_namespace.enter_transition(tran.name)
+
         assert tran.decorator_list  # At least one decorator
         pre_body = "act." + tran.name + "?&&" + \
                    "&&".join(map(self.visit, tran.decorator_list))
         eff_body = self.visit(tran.body)
         # FIXME If possible, return a string like other functions
-        return tran.name, (pre_body, eff_body)
+        result = tran.name, (pre_body, eff_body)
+
+        # Reset namespace
+        self._current_namespace.exit()
+        return result
 
     def visit_ActionType(self, act_typ: IOA) -> str:
         if self._get_scope() == IOA.FORMAL_ACT:
@@ -814,8 +874,42 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
     def visit_ExternalCall(self, call: ast.Call) -> str:
         assert not call.keywords
-        # TODO use built-in operators
+        if isinstance(call.func, ast.Name):
+            if call.func.id == "len":
+                assert len(call.args) == 1
+                return " |" + self.visit(call.args[0]) + "| "
+            if call.func.id == "implies":
+                assert len(call.args) == 2
+                return "(" + self.visit(call.args[0]) + " ==> " + \
+                       self.visit(call.args[1]) + ")"
+            if call.func.id in ["forall", "exists"]:
+                assert len(call.args) == 2
+                return self.__quantification(call.func.id,
+                                             call.args[0], call.args[1])
+        # else:
         return self.visit(call.func) + "(" + \
             ", ".join(map(self.visit, call.args)) + ")"
+
+    def __quantification(self, quantifier: str,
+                         domain: ast.Expr, expr: ast.Expr) -> str:
+        if isinstance(domain, ast.Name):
+            # single variable
+            bounded_vars = [domain.id]
+        elif isinstance(domain, ast.List):
+            assert all(map(lambda e: isinstance(e, ast.Name), domain.elts))
+            bounded_vars = [e.id for e in domain.elts]
+        else:
+            # TODO we could support other formats for the domain.
+            #  E.g., (x in int), (0 <= x < len(arr)), etc.
+            raise RuntimeError("Domain for quantification is ill-formed")
+
+        # Set namespace
+        self._current_namespace.enter_quantification(bounded_vars)
+
+        result = "(" + quantifier + " " + ", ".join(bounded_vars) + "::" + self.visit(expr) + ")"
+
+        # Reset namespace
+        self._current_namespace.exit()
+        return result
 
     # endregion
