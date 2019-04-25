@@ -1,4 +1,4 @@
-UID: type = IntEnum(0, 1, 2)
+UID: type = IntRange(0, 3)
 Status: type = Enum(UNKNOWN, CHOSEN, REPORTED)
 
 @composition

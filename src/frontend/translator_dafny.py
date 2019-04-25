@@ -154,6 +154,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
                "disjoint": "disjoint",
                "max": "max",
                "range": "range",
+               "incre": "incre",
                # Are there more built-in types to translate?
                }
 
@@ -246,7 +247,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         if self.__parameters:
             arg_list.append("para: Parameter")
 
-        ret_list = ["lemma bmc_invariant_of(" + ", ".join(arg_list) + ")"]
+        ret_list = ["lemma bmc_proof?(" + ", ".join(arg_list) + ")"]
         if self.__parameters:  # FIXME What if `where` clause is not specified
             ret_list.append("requires " +
                             self.__func_name_args(IOA.WHERE, type_hint=False))
@@ -276,7 +277,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         if self.__parameters:
             arg_list.append("para: Parameter")
 
-        ret_list = ["lemma induction_invariant_of(" + ", ".join(arg_list) + ")"]
+        ret_list = ["lemma induction_proof?(" + ", ".join(arg_list) + ")"]
         if self.__parameters:  # FIXME What if `where` clause is not specified
             ret_list.append("requires " +
                             self.__func_name_args(IOA.WHERE, type_hint=False))
@@ -559,10 +560,6 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
         type_def_list += [
             action_type,
-            # TODO move these functions to a prelude file
-            #"function max(a: UID, b: UID, c: UID): UID"
-            #"{ var tmp := if a >= b then a else b; if tmp >= c then tmp else c }",
-            "function len<T>(arr: seq<T>): nat{ |arr| }"
         ]
 
         mod_types = "module Types" + \
@@ -586,14 +583,29 @@ class _ToDafnyVisitor(IOAAstVisitor):
         arg_list = list(map(self.visit, typ.args))
         name = "shorthand'" + str(self.__tmp_id_count)
         self.__tmp_id_count += 1
-        shorthand = {
-            "Enum":
-                "datatype " + name + " = " + " | ".join(arg_list),
-            "IntEnum":
-                "newtype " + name + " = n: int | " +
-                "||".join(map(lambda v: "n==" + v, arg_list)),
-        }
-        return name + '\n' + shorthand[cons]
+        # TODO Check that for IntEnum and IntRange the arguments
+        #  must be numbers, i.e., ast.Num
+
+        if cons == "Enum":
+            shorthand = "datatype " + name + " = " + " | ".join(arg_list)
+        elif cons == "IntEnum":
+            shorthand = "newtype " + name + " = n: int | " + "||".join(map(lambda v: "n==" + v, arg_list))
+        elif cons == "IntRange":
+            shorthand = "newtype " + name + " = n: int | " + arg_list[0] + "<=n<" + arg_list[1] + "\n"
+            # TODO move these functions to a prelude file
+            shorthand += "function max(a: " + name + ", b: " + name + ", c: " + name + "): " + name +\
+                         "\n{ var tmp := if a >= b then a else b; if tmp >= c then tmp else c }\n"
+            shorthand += \
+                "function incre(n: " + name + "): " + name + \
+                self.__body_block(
+                    "if n==" + str(ast.literal_eval(arg_list[1])-1) +
+                    " then " + arg_list[0] + " else n+1",
+                    one_line=True
+                )
+        else:
+            raise ValueError("Unexpected shorthand type constructor \"" + cons + "\"")
+
+        return name + '\n' + shorthand + '\n'
 
     def visit_Composition(self, comp: ast.FunctionDef) -> str:
         # Set namespace for the given automaton

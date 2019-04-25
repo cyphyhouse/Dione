@@ -17,7 +17,7 @@ async def run(options):
     dfy_code = TranslatorDafny(options.ioa).get_dafny_code()
     async with ProverDafny(dfy_exe) as prover:  # This creates a new process
         # TODO Specify pattern to prove invariant proof only
-        print(await prover.verify(dfy_code, ["-proc:*invariant*of*"]))
+        print(await prover.verify(dfy_code, ["-proc:*proof_q*"]))
 
 
 def main(args=None):
