@@ -155,6 +155,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
                "max": "max",
                "range": "range",
                "incre": "incre",
+               "decre": "decre",
                # Are there more built-in types to translate?
                }
 
@@ -560,6 +561,8 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
         type_def_list += [
             action_type,
+            "function max(a: nat, b: nat, c: nat): nat\n"
+            "{ var tmp := if a >= b then a else b; if tmp >= c then tmp else c }\n"
         ]
 
         mod_types = "module Types" + \
@@ -593,13 +596,18 @@ class _ToDafnyVisitor(IOAAstVisitor):
         elif cons == "IntRange":
             shorthand = "newtype " + name + " = n: int | " + arg_list[0] + "<=n<" + arg_list[1] + "\n"
             # TODO move these functions to a prelude file
-            shorthand += "function max(a: " + name + ", b: " + name + ", c: " + name + "): " + name +\
-                         "\n{ var tmp := if a >= b then a else b; if tmp >= c then tmp else c }\n"
             shorthand += \
                 "function incre(n: " + name + "): " + name + \
                 self.__body_block(
                     "if n==" + str(ast.literal_eval(arg_list[1])-1) +
                     " then " + arg_list[0] + " else n+1",
+                    one_line=True
+                )
+            shorthand += \
+                "function decre(n: " + name + "): " + name + \
+                self.__body_block(
+                    "if n==" + arg_list[0] +
+                    " then " + str(ast.literal_eval(arg_list[1])-1) + " else n-1",
                     one_line=True
                 )
         else:
