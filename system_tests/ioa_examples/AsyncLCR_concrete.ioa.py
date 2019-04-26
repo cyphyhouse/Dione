@@ -18,6 +18,7 @@ def Sys(u0: UID, u1: UID, u2: UID):
 
 @automaton
 def AsyncLCR0(u: UID):
+    where = True
 
     class signature:
         @output

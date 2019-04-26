@@ -19,13 +19,14 @@ def Sys(u0: UID, u1: UID, u2: UID):
 
 @automaton
 def AsyncLCR(i: Index, u: UID):
+    where = True
 
     class signature:
         @output
-        def sendrecv(src: Index, dst: Index, v: UID):
+        def send_recv(src: Index, dst: Index, v: UID):
             where = src == i and dst == incre(i)
         @input
-        def sendrecv(src: Index, dst: Index, v: UID):
+        def send_recv(src: Index, dst: Index, v: UID):
             where = src == decre(i) and dst == i
         @output
         def leader(id: Index):
@@ -39,11 +40,11 @@ def AsyncLCR(i: Index, u: UID):
     class transitions:
         @output
         @pre(q != [] and v == q[0])
-        def sendrecv(v, src, dst):
+        def send_recv(src, dst, v):
             q = q[1:]
 
         @input
-        def sendrecv(v, src ,dst):
+        def send_recv(src ,dst, v):
             if v > u:
                 q = q + [v]
             elif v == u:

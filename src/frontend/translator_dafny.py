@@ -180,6 +180,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
             # TODO Deal with where constraints over automaton parameters
             body_list.append(self.visit(stmt))
 
+        body_list.append(self.__lemma_disjoint_actions())
         body_list.append(
             self.__func_name_args(IOA.SIGNATURE) +
             self.__body_block(
@@ -239,6 +240,29 @@ class _ToDafnyVisitor(IOAAstVisitor):
             return "\n{ " + body + " }\n"
         else:
             return " {\n" + body + "\n}\n"
+
+    def __lemma_disjoint_actions(self) -> str:
+        arg_list = ["act: Action"]
+        if self.__parameters:
+            arg_list.append("para: Parameter")
+
+        ret_list = ["lemma disjoint_actions_proof?(" + ", ".join(arg_list) + ")"]
+        if self.__parameters:  # FIXME What if `where` clause is not specified
+            ret_list.append("requires " +
+                            self.__func_name_args(IOA.WHERE, type_hint=False))
+
+        ret_list += [
+            "ensures !(" +
+            self.__func_name_args(IOA.INPUT, type_hint=False) + "&&" +
+            self.__func_name_args(IOA.INTERNAL, type_hint=False) + ")",
+            "ensures !(" +
+            self.__func_name_args(IOA.INPUT, type_hint=False) + "&&" +
+            self.__func_name_args(IOA.OUTPUT, type_hint=False) + ")",
+            "ensures !(" +
+            self.__func_name_args(IOA.INTERNAL, type_hint=False) + "&&" +
+            self.__func_name_args(IOA.OUTPUT, type_hint=False) + ")",
+        ]
+        return "\n".join(ret_list) + self.__body_block("", True)
 
     def __lemma_bmc(self) -> str:
         k = self.__k_steps
@@ -680,6 +704,26 @@ class _ToDafnyVisitor(IOAAstVisitor):
                 "||\n".join(map(call_comp_func(IOA.INTERNAL), comp_list))
             )
 
+        # Define compatibility lemma
+        arg_list = ["act: Action"]
+        if self.__parameters:
+            arg_list.append("para: Parameter")
+        compatible = ["lemma compatibility_proof?(" + ", ".join(arg_list) + ")"]
+        if self.__parameters:  # FIXME What if `where` clause is not specified
+            compatible.append("requires " +
+                              self.__func_name_args(IOA.WHERE, type_hint=False))
+        compatible += [
+            "ensures !(" + call_comp_func(IOA.OUTPUT)(comp_list[i]) + "&&" +
+                           call_comp_func(IOA.OUTPUT)(comp_list[j]) + ")\n" +
+            "ensures !(" + call_comp_func(IOA.INTERNAL)(comp_list[i]) + "&&" +
+                           call_comp_func(IOA.SIGNATURE)(comp_list[j]) + ")\n" +
+            "ensures !(" + call_comp_func(IOA.SIGNATURE)(comp_list[i]) + "&&" +
+                           call_comp_func(IOA.INTERNAL)(comp_list[j]) + ")"
+            for i in range(len(comp_list)) for j in range(i + 1, len(comp_list))
+        ]
+        compatible.append(self.__body_block("", True))
+        compatible = '\n'.join(compatible)
+
         # Define transitions
         def check_sig(c):
             return "(if " + call_comp_func(IOA.SIGNATURE)(c) + \
@@ -688,7 +732,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         transitions = self.__func_name_args(IOA.TRANSITIONS) + \
                       self.__body_block("&&\n".join(map(check_sig, comp_list)))
         return import_comps + state_typ + initially + \
-            inp + outp + internal + transitions
+            inp + outp + internal + compatible + transitions
 
     def visit_DeclComponent(self, lhs: ast.expr, typ: ast.expr,
                             rhs: Optional[ast.expr]) -> Tuple[str, str, str]:
