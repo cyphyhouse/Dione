@@ -1,13 +1,13 @@
-""" Mutual Exclusion on a Bidirection Array """
+""" Mutual Exclusion on a bi-directional array """
 
 Status: type = IntRange(0, 4)
 
 @automaton
-def FourState(N: int):
+def StableArray(N: int):
     where= 2 <= N
 
     class signature:
-        @internal
+        @output
         def trans(i: int): where=0 <= i < N
 
     class states:
@@ -15,17 +15,17 @@ def FourState(N: int):
     initially = len(s) == N and (s[0] == 1 or s[0] == 3) and (s[N-1] == 0 or s[N-1] == 2)
 
     class transitions:
-        @internal
+        @output
         @pre((i == 0 and s[i+1] == incre(s[i])) or (i == N-1 and s[i-1] == incre(s[i])))
         def trans(i):
             s[i] = incre(incre(s[i]))
 
-        @internal
+        @output
         @pre(0 < i < N-1 and s[i-1] == incre(s[i]))
         def trans(i):
             s[i] = s[i-1]
 
-        @internal
+        @output
         @pre(0 < i < N-1 and s[i+1] == incre(s[i]))
         def trans(i):
             s[i] = s[i+1]

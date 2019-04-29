@@ -1,11 +1,11 @@
-"""Dijkstra's token ring self-stabilizing system"""
+""" Dijkstra's self-stabilizing algorithm on a ring """
 
 @automaton
-def StablizingTokenRing(N: int, K: int):
+def StableRing(N: int, K: int):
     where = 1 < N < K
 
     class signature:
-        @internal
+        @output
         def trans(i: int): where = 0 <= i < N
 
     class states:
@@ -13,12 +13,12 @@ def StablizingTokenRing(N: int, K: int):
     initially = len(x) == N and forall(i, implies(0<=i<N, x[i] <= K))
 
     class transitions:
-        @internal
+        @output
         @pre(i == 0 and x[i] == x[N-1])
         def trans(i):
             x[i] = (x[N-1] + 1) % K
 
-        @internal
+        @output
         @pre(i != 0 and x[i] != x[i-1])
         def trans(i):
             x[i] = x[i-1]
