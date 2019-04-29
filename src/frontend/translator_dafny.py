@@ -35,15 +35,33 @@ class TranslatorDafny:
 
 
 class _IOANamespace:
+    ioa2dfy = {"Bool": "bool",
+               "Char": "char",
+               "Int": "int",
+               "Nat": "nat",
+               "Real": "real",
+               "Seq": "seq",
+               "Map": "map",
+               "Set": "set",
+               "Mset": "multiset",
+               "disjoint": "disjoint",
+               "max": "max",
+               "range": "range",
+               "incre": "incre",
+               "decre": "decre",
+               # Are there more built-in types to translate?
+               }
+
     AutNamespace = namedtuple('AutNamespace', ['parameters', 'states',
                                                'act_formals', 'local_vars'])
 
     def __init__(self, sym_tab: symtable.SymbolTable):
         # FIXME Use another visitor to initialize namespaces
+        #  This namespace may include not declared types and miss errors
         assert sym_tab.get_type() == "module"
         self.__ns_stack = []
         self.__system = \
-            set(_ToDafnyVisitor.ioa2dfy.keys()) \
+            set(self.ioa2dfy.keys()) \
             | set(sym_tab.get_identifiers()) | set([e.value for e in IOA])
 
         self.__automaton = {}
@@ -138,27 +156,11 @@ class _IOANamespace:
                 return "para." + identifier
         # else:
         if identifier in self.__system:
-            return identifier
+            return self.ioa2dfy.get(identifier, identifier)
         raise RuntimeError("Unexpected identifier \"" + identifier + "\"")
 
 
 class _ToDafnyVisitor(IOAAstVisitor):
-    ioa2dfy = {"Char": "char",
-               "Int": "int",
-               "Nat": "nat",
-               "Real": "real",
-               "Seq": "seq",
-               "Map": "map",
-               "Set": "set",
-               "Mset": "multiset",
-               "disjoint": "disjoint",
-               "max": "max",
-               "range": "range",
-               "incre": "incre",
-               "decre": "decre",
-               # Are there more built-in types to translate?
-               }
-
     def __init__(self, ns: _IOANamespace, k: int):
         assert k > 0
         super().__init__()
@@ -425,15 +427,9 @@ class _ToDafnyVisitor(IOAAstVisitor):
         return ret
 
     def visit_Subscript(self, exp) -> str:
-        # FIXME We can also do this case split in IOAAstVisitor, for example,
-        #  call visit_GenericType() or visit_ExprSubscript() based on cases
-        if self._get_scope() in \
-                [IOA.TYPE_DEF, IOA.FORMAL_PARA, IOA.DECL_VAR]:
-            assert not isinstance(exp.ctx, ast.Store) \
-                and not isinstance(exp.ctx, ast.AugStore)
-            # Angle brackets are used for parametrized type in Dafny
-            return self.visit(exp.value) + "<" + self.visit(exp.slice) + ">"
+        return super().visit_Subscript(exp)
 
+    def visit_Select(self, exp):
         if isinstance(exp.ctx, ast.Store) or \
                 isinstance(exp.ctx, ast.AugStore):
             assert isinstance(exp.value, ast.Name)
@@ -442,6 +438,12 @@ class _ToDafnyVisitor(IOAAstVisitor):
                 "visit_StmtAssign")
         # else:
         return self.visit(exp.value) + "[" + self.visit(exp.slice) + "]"
+
+    def visit_TypeHint(self, exp) -> str:
+        typ_cons = self.visit(exp.value)
+        assert typ_cons in ['seq', 'set', 'map', 'multiset']
+        # Angle brackets are used for generic type in Dafny
+        return typ_cons + "<" + self.visit(exp.slice) + ">"
 
     def visit_Starred(self, exp):
         raise NotImplementedError
@@ -468,7 +470,8 @@ class _ToDafnyVisitor(IOAAstVisitor):
         return ret
 
     def visit_ExtSlice(self, slc):
-        raise NotImplementedError
+        assert all(map(lambda d: d.lower and d.upper and not d.step, slc.dims))
+        return ', '.join([self.visit(d.lower) + ": " + self.visit(d.upper) for d in slc.dims])
 
     def visit_Index(self, slc):
         return self.visit(slc.value)
@@ -596,44 +599,51 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
     def visit_TypeDef(self, lhs: ast.expr, rhs: ast.expr) -> str:
         assert isinstance(lhs, ast.Name)
-        # TODO translate type definitions
         typ_name = self.visit(lhs)
         return "type " + typ_name + " = " + self.visit(rhs)
 
-    def visit_Shorthand(self, typ: ast.Call) -> str:
-        assert isinstance(typ.func, ast.Name)
-        assert not typ.keywords
-        assert all(isinstance(arg, ast.Name) for arg in typ.args) \
-            or all(isinstance(arg, ast.Num) for arg in typ.args)
+    def visit_Shorthand(self, typ: ast.Subscript) -> str:
+        assert isinstance(typ.value, ast.Name)
 
-        cons = self.visit(typ.func)
-        arg_list = list(map(self.visit, typ.args))
+        cons = self.visit(typ.value)
         name = "shorthand'" + str(self.__tmp_id_count)
         self.__tmp_id_count += 1
-        # TODO Check that for IntEnum and IntRange the arguments
-        #  must be numbers, i.e., ast.Num
-
         if cons == "Enum":
-            shorthand = "datatype " + name + " = " + " | ".join(arg_list)
+            assert isinstance(typ.slice, ast.Index)
+            assert isinstance(typ.slice.value, ast.Tuple)
+            assert all(isinstance(e, ast.Name) for e in typ.slice.value.elts)
+            arg_iter = map(self.visit, typ.slice.value.elts)
+            shorthand = "datatype " + name + " = " + " | ".join(arg_iter)
         elif cons == "IntEnum":
-            shorthand = "newtype " + name + " = n: int | " + "||".join(map(lambda v: "n==" + v, arg_list))
+            assert isinstance(typ.slice, ast.Index)
+            assert isinstance(typ.slice.value, ast.Tuple)
+            assert all(isinstance(e, ast.Num) for e in typ.slice.value.elts)
+            arg_iter = map(self.visit, typ.slice.value.elts)
+            shorthand = "newtype " + name + " = n: int | " + "||".join(map(lambda v: "n==" + v, arg_iter))
         elif cons == "IntRange":
-            shorthand = "newtype " + name + " = n: int | " + arg_list[0] + "<=n<" + arg_list[1] + "\n"
+            assert isinstance(typ.slice, ast.Slice)
+            assert typ.slice.upper and typ.slice.lower and not typ.slice.step
+            upper = self.visit(typ.slice.upper)
+            lower = self.visit(typ.slice.lower)
+            shorthand = "newtype " + name + " = n: int | " + lower + "<=n<" + upper + "\n"
             # TODO move these functions to a prelude file
             shorthand += \
                 "function incre(n: " + name + "): " + name + \
                 self.__body_block(
-                    "if n==" + str(ast.literal_eval(arg_list[1])-1) +
-                    " then " + arg_list[0] + " else n+1",
+                    "if n==" + str(ast.literal_eval(upper)-1) +
+                    " then " + lower + " else n+1",
                     one_line=True
                 )
             shorthand += \
                 "function decre(n: " + name + "): " + name + \
                 self.__body_block(
-                    "if n==" + arg_list[0] +
-                    " then " + str(ast.literal_eval(arg_list[1])-1) + " else n-1",
+                    "if n==" + lower +
+                    " then " + str(ast.literal_eval(upper)-1) + " else n-1",
                     one_line=True
                 )
+        elif cons == 'NamedTuple':
+            arg_list = self.visit(typ.slice)
+            shorthand = "datatype " + name + " = " + name + "(" + arg_list + ")"
         else:
             raise ValueError("Unexpected shorthand type constructor \"" + cons + "\"")
 
@@ -929,12 +939,9 @@ class _ToDafnyVisitor(IOAAstVisitor):
         if isinstance(name.ctx, ast.Param) or \
                 isinstance(name.ctx, ast.Store) or \
                 isinstance(name.ctx, ast.AugStore):
-            assert name.id not in self.ioa2dfy
             return name.id
         # else:  # R-value in assignment or type annotations
-        ret = self._current_namespace.add_namespace(name.id)
-        # FIXME do we need ioa2dfy mapping at all?
-        return self.ioa2dfy.get(ret, ret)
+        return self._current_namespace.add_namespace(name.id)
 
     def visit_ExternalCall(self, call: ast.Call) -> str:
         assert not call.keywords

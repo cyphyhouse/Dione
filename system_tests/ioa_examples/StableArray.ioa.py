@@ -1,6 +1,6 @@
 """ Mutual Exclusion on a bi-directional array """
 
-Status: type = IntRange(0, 4)
+Status: type = IntRange[0:4]
 
 @automaton
 def StableArray(N: int):

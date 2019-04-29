@@ -1,6 +1,6 @@
-Index: type = IntRange(0, 3)
+Index: type = IntRange[0:3]
 UID: type = Nat
-Status: type = Enum(UNKNOWN, CHOSEN, REPORTED)
+Status: type = Enum[UNKNOWN, CHOSEN, REPORTED]
 
 @composition
 def Sys(u0: UID, u1: UID, u2: UID):

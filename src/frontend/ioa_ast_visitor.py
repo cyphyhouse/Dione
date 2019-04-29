@@ -110,9 +110,6 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
                          "\" when specifying " + self.__scope.value)
 
     def visit_Call(self, call):
-        if self.__scope == IOA.TYPE_DEF:
-            with IOAScopeHandler(self.__scope, IOA.SHORTHAND):
-                return self.visit_Shorthand(call)
         if self.__scope == IOA.TRANSITION:
             if isinstance(call.func, ast.Name) and call.func.id == str(IOA.PRE):
                 assert call.args and len(call.args) == 1
@@ -221,8 +218,22 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     def visit_Pass(self, stmt):
         return self.visit_StmtPass(stmt)
 
-    def visit_Subscript(self, expr):
-        # TODO Differentiate between types and values
+    def visit_Subscript(self, exp):
+        if self.__scope == IOA.TYPE_DEF:
+            with IOAScopeHandler(self.__scope, IOA.SHORTHAND):
+                return self.visit_Shorthand(exp)
+        if self.__scope in \
+                [IOA.TYPE_DEF, IOA.FORMAL_PARA, IOA.DECL_VAR]:
+            assert not isinstance(exp.ctx, ast.Store) \
+                and not isinstance(exp.ctx, ast.AugStore)
+            return self.visit_TypeHint(exp)
+        # else:
+        return self.visit_Select(exp)
+
+    def visit_TypeHint(self, exp):
+        pass
+
+    def visit_Select(self, exp):
         pass
 
     def visit_arguments(self, arguments):
