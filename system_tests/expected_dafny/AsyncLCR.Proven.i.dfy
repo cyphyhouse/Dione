@@ -1,9 +1,8 @@
 module Types {
-type Index = shorthand'0
-newtype shorthand'0 = n: int | 0<=n<3
-function incre(n: shorthand'0): shorthand'0
+newtype Index = n: int | 0<=n<3
+function incre(n: Index): Index
 { if n==2 then 0 else n+1 }
-function decre(n: shorthand'0): shorthand'0
+function decre(n: Index): Index
 { if n==0 then 2 else n-1 }
 
 predicate between(lower: Index, i: Index, upper: Index)
@@ -16,8 +15,7 @@ predicate between(lower: Index, i: Index, upper: Index)
 
 
 type UID = nat
-type Status = shorthand'1
-datatype shorthand'1 = UNKNOWN | CHOSEN | REPORTED
+datatype Status = UNKNOWN | CHOSEN | REPORTED
 
 datatype Action = send_recv(src: Index, dst: Index, v: UID) | leader(id: Index)
 function max(a: nat, b: nat, c: nat): nat

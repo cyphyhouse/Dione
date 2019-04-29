@@ -1,9 +1,8 @@
 module Types {
-type Status = shorthand'0
-newtype shorthand'0 = n: int | 0<=n<4
-function incre(n: shorthand'0): shorthand'0
+newtype Status = n: int | 0<=n<4
+function incre(n: Status): Status
 { if n==3 then 0 else n+1 }
-function decre(n: shorthand'0): shorthand'0
+function decre(n: Status): Status
 { if n==0 then 3 else n-1 }
 
 

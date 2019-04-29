@@ -580,7 +580,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         type_def_list, rem_list = [], []
         for s in stmt_list:
             # FIXME using prefix of returned string feels unsafe
-            if s.startswith("type"):
+            if any(s.startswith(ty) for ty in ["type", "newtype", "datatype"]):
                 type_def_list.append(s)
             else:
                 rem_list.append(s)
@@ -603,13 +603,18 @@ class _ToDafnyVisitor(IOAAstVisitor):
     def visit_TypeDef(self, lhs: ast.expr, rhs: ast.expr) -> str:
         assert isinstance(lhs, ast.Name)
         typ_name = self.visit(lhs)
-        return "type " + typ_name + " = " + self.visit(rhs)
+        typ_rhs = self.visit(rhs)
+
+        # FIXME hacky way to rename type
+        if "shorthand'" in typ_rhs:
+            return typ_rhs.replace("shorthand'", typ_name)
+        return "type " + typ_name + " = " + typ_rhs
 
     def visit_Shorthand(self, typ: ast.Subscript) -> str:
         assert isinstance(typ.value, ast.Name)
 
         cons = self.visit(typ.value)
-        name = "shorthand'" + str(self.__tmp_id_count)
+        name = "shorthand'"
         self.__tmp_id_count += 1
         if cons == "Enum":
             assert isinstance(typ.slice, ast.Index)
@@ -650,7 +655,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         else:
             raise ValueError("Unexpected shorthand type constructor \"" + cons + "\"")
 
-        return name + '\n' + shorthand + '\n'
+        return shorthand + '\n'
 
     def visit_Composition(self, comp: ast.FunctionDef) -> str:
         # Set namespace for the given automaton
