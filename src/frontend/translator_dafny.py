@@ -49,6 +49,7 @@ class _IOANamespace:
                "range": "range",
                "incre": "incre",
                "decre": "decre",
+               "bv_extract": "bv_extract",
                # Are there more built-in types to translate?
                }
 
@@ -344,8 +345,10 @@ class _ToDafnyVisitor(IOAAstVisitor):
     def visit_Lambda(self, exp):
         raise NotImplementedError("\"lambda\" expression is not supported yet")
 
-    def visit_IfExp(self, exp):
-        raise NotImplementedError("ITE expression is not supported yet")
+    def visit_IfExp(self, exp: ast.IfExp) -> str:
+        return "(if " + self.visit(exp.test) + \
+               " then " + self.visit(exp.body) + \
+               " else " + self.visit(exp.orelse) + ")"
 
     def visit_Dict(self, exp):
         raise NotImplementedError("Dictionary expression is not supported yet")
