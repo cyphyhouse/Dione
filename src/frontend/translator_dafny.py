@@ -44,6 +44,11 @@ class _IOANamespace:
                "Map": "map",
                "Set": "set",
                "Mset": "multiset",
+               # Python typing module
+               "Sequence": "seq",
+               "Mapping": "map",
+               "Counter": "multiset",
+               # Some hacking
                "disjoint": "disjoint",
                "max": "max",
                "range": "range",
