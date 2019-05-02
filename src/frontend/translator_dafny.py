@@ -55,6 +55,7 @@ class _IOANamespace:
                "incre": "incre",
                "decre": "decre",
                "bv_extract": "bv_extract",
+               "i_min": "i_min",
                # Are there more built-in types to translate?
                }
 
@@ -361,7 +362,27 @@ class _ToDafnyVisitor(IOAAstVisitor):
     def visit_Set(self, exp):
         raise NotImplementedError("Finite set expression is not supported yet")
 
-    def visit_ListComp(self, exp):
+    def visit_ListComp(self, exp: ast.ListComp) -> str:
+        # FIXME maybe we can visit generators
+        assert exp.generators
+        assert len(exp.generators) == 1  # TODO support multiple generators
+        for gen in exp.generators:
+            assert isinstance(gen.target, ast.Name)  # TODO support multiple bounded variables
+            assert not gen.ifs  # TODO support filters
+            var = self.visit(gen.target)
+            sequence = self.visit(gen.iter)
+
+        # Set namespace
+        bounded_vars = [var]
+        self._current_namespace.enter_quantification(bounded_vars)
+
+        mapped = self.visit(exp.elt)
+
+        # Reset namespace
+        self._current_namespace.exit()
+
+        return "applyMapSeq(map " + var + " | " + var + " in " + sequence + " :: " + \
+               mapped + ", " + sequence + ")"
         raise NotImplementedError("List comprehension expression is not supported yet")
 
     def visit_SetComp(self, exp):
