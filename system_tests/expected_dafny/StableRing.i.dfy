@@ -18,24 +18,24 @@ predicate output(act: Action, para: Parameter)
 predicate internal(act: Action, para: Parameter)
 { false }
 
-datatype State = State(x: seq<int>)
+datatype State = State(s: seq<int>)
 predicate initially(s: State, para: Parameter)
-{ (( |s.x| ==para.N)&&(forall i::((0<=i<para.N) ==> (s.x[i]<=para.K)))) }
+{ (( |s.s| ==para.N)&&(forall i::((0<=i<para.N) ==> (0<=s.s[i]<para.K)))) }
 
 predicate pre'0_trans(s: State, act: Action, para: Parameter)
-{ act.trans?&&output(act, para)&&((act.i==0)&&(s.x[act.i]==s.x[(para.N-1)])) }
+{ act.trans?&&output(act, para)&&((act.i==0)&&(s.s[act.i]==s.s[(para.N-1)])) }
 
 function eff'0_trans(s: State, act: Action, para: Parameter): State
   requires pre'0_trans(s, act, para) {
-var s: State := s.(x:=s.x[act.i := ((s.x[(para.N-1)]+1)%para.K)]); s
+var s: State := s.(s:=s.s[act.i := ((s.s[(para.N-1)]+1)%para.K)]); s
 }
 
 predicate pre'1_trans(s: State, act: Action, para: Parameter)
-{ act.trans?&&output(act, para)&&((act.i!=0)&&(s.x[act.i]!=s.x[(act.i-1)])) }
+{ act.trans?&&output(act, para)&&((act.i!=0)&&(s.s[act.i]!=s.s[(act.i-1)])) }
 
 function eff'1_trans(s: State, act: Action, para: Parameter): State
   requires pre'1_trans(s, act, para) {
-var s: State := s.(x:=s.x[act.i := s.x[(act.i-1)]]); s
+var s: State := s.(s:=s.s[act.i := s.s[(act.i-1)]]); s
 }
 
 predicate transitions(s: State, act: Action, s': State, para: Parameter) {
@@ -44,7 +44,7 @@ predicate transitions(s: State, act: Action, s': State, para: Parameter) {
 }
 
 predicate invariant_of(s: State, para: Parameter)
-{ (( |s.x| ==para.N)&&(forall i::((0<=i<para.N) ==> (s.x[i]<=para.K)))) }
+{ (( |s.s| ==para.N)&&(forall i::((0<=i<para.N) ==> (0<=s.s[i]<para.K)))) }
 lemma bmc_proof?(s0: State, para: Parameter)
 requires automaton_where(para)
 requires initially(s0, para)

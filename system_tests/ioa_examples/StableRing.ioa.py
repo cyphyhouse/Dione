@@ -9,19 +9,19 @@ def StableRing(N: int, K: int):
         def trans(i: int): where = 0 <= i < N
 
     class states:
-        x: Seq[int]
-    initially = len(x) == N and forall(i, implies(0<=i<N, x[i] <= K))
+        s: Seq[int]
+    initially = len(s) == N and forall(i, implies(0<=i<N, 0<=s[i]<K))
 
     class transitions:
         @output
-        @pre(i == 0 and x[i] == x[N-1])
+        @pre(i == 0 and s[i] == s[N-1])
         def trans(i):
-            x[i] = (x[N-1] + 1) % K
+            s[i] = (s[N-1] + 1) % K
 
         @output
-        @pre(i != 0 and x[i] != x[i-1])
+        @pre(i != 0 and s[i] != s[i-1])
         def trans(i):
-            x[i] = x[i-1]
+            s[i] = s[i-1]
 
-    invariant_of = len(x) == N and \
-        forall(i, implies(0<=i<N, x[i] <= K))
+    invariant_of = len(s) == N and \
+        forall(i, implies(0<=i<N, 0<=s[i]<K))
