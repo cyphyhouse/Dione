@@ -6,11 +6,13 @@ function decre(n: Index): Index
 { if n==0 then 2 else n-1 }
 
 predicate between(lower: Index, i: Index, upper: Index)
+    requires lower != i
+    requires lower != upper
 {
-    if lower <= upper then
-        (lower <= i < upper)
+    if lower < upper then
+        (lower < i <= upper)
     else
-        (i >= lower || i < upper)
+        (i > lower || i <= upper)
 }
 
 
@@ -84,16 +86,12 @@ predicate invariant_of(s: State, para: Parameter)
 ((para.u0!=max(para.u0, para.u1, para.u2)) ==> (s.P0.status==UNKNOWN))&&
 ((para.u1!=max(para.u0, para.u1, para.u2)) ==> (s.P1.status==UNKNOWN))&&
 ((para.u2!=max(para.u0, para.u1, para.u2)) ==> (s.P2.status==UNKNOWN))&&
-((0 != i_max(para.u0, para.u1, para.u2) && between(i_max(para.u0, para.u1, para.u2), 0, 0)) ==> para.u0 !in s.P0.q)&&
-((0 != i_max(para.u0, para.u1, para.u2) && between(i_max(para.u0, para.u1, para.u2), 1, 0)) ==> para.u0 !in s.P1.q)&&
-((0 != i_max(para.u0, para.u1, para.u2) && between(i_max(para.u0, para.u1, para.u2), 2, 0)) ==> para.u0 !in s.P2.q)&&
-((1 != i_max(para.u0, para.u1, para.u2) && between(i_max(para.u0, para.u1, para.u2), 0, 1)) ==> para.u1 !in s.P0.q)&&
-((1 != i_max(para.u0, para.u1, para.u2) && between(i_max(para.u0, para.u1, para.u2), 1, 1)) ==> para.u1 !in s.P1.q)&&
-((1 != i_max(para.u0, para.u1, para.u2) && between(i_max(para.u0, para.u1, para.u2), 2, 1)) ==> para.u1 !in s.P2.q)&&
-((2 != i_max(para.u0, para.u1, para.u2) && between(i_max(para.u0, para.u1, para.u2), 0, 2)) ==> para.u2 !in s.P0.q)&&
-((2 != i_max(para.u0, para.u1, para.u2) && between(i_max(para.u0, para.u1, para.u2), 1, 2)) ==> para.u2 !in s.P1.q)&&
-((2 != i_max(para.u0, para.u1, para.u2) && between(i_max(para.u0, para.u1, para.u2), 2, 2)) ==> para.u2 !in s.P2.q)
-
+((0 != i_max(para.u0, para.u1, para.u2) && between(0, i_max(para.u0, para.u1, para.u2), 1)) ==> para.u0 !in s.P1.q)&&
+((0 != i_max(para.u0, para.u1, para.u2) && between(0, i_max(para.u0, para.u1, para.u2), 2)) ==> para.u0 !in s.P2.q)&&
+((1 != i_max(para.u0, para.u1, para.u2) && between(1, i_max(para.u0, para.u1, para.u2), 0)) ==> para.u1 !in s.P0.q)&&
+((1 != i_max(para.u0, para.u1, para.u2) && between(1, i_max(para.u0, para.u1, para.u2), 2)) ==> para.u1 !in s.P2.q)&&
+((2 != i_max(para.u0, para.u1, para.u2) && between(2, i_max(para.u0, para.u1, para.u2), 0)) ==> para.u2 !in s.P0.q)&&
+((2 != i_max(para.u0, para.u1, para.u2) && between(2, i_max(para.u0, para.u1, para.u2), 1)) ==> para.u2 !in s.P1.q)
 }
 lemma bmc_proof?(s0: State, para: Parameter)
 requires automaton_where(para)
