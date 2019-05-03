@@ -16,11 +16,11 @@ lemma same_value_proof?<T>(arr: seq<T>)
     }
 }
 
-lemma singleton_proof?<T>(s: set<T>, i: T)
-   requires i in s
-   ensures s - {i} == {} <==> |s - {i}| == 0
-   ensures s - {i} == {} <==> |s| == 1
-   ensures|s - {i}|== 0  <==> |s| == 1
+lemma singleton_proof?<T>(I: set<T>, i: T)
+   requires i in I
+   ensures |I| == 1 <==> |I - {i}| == 0
+   ensures |I - {i}| == 0 <==> I - {i} == {}
+   ensures I - {i} == {} <==> I == {i}
 {}
 }
 /* Dijkstra's self-stabilizing algorithm on a ring */
@@ -85,7 +85,7 @@ lemma induction_proof?(s0: State, s1: State, a1: Action, para: Parameter)
 requires automaton_where(para)
 requires invariant_of(s0, para)
 requires transitions(s0, a1, s1, para)
-//ensures invariant_of(s1, para)
+ensures invariant_of(s1, para)
 {
     var s0_has_token := set i | 0<=i<para.N &&
         ((i==0 && s0.s[i] == s0.s[para.N-1]) || (i!=0 && s0.s[i] != s0.s[i-1]));
