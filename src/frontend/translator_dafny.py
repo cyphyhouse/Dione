@@ -10,8 +10,8 @@ from src.frontend.ioa_constructs import IOA
 
 
 class TranslatorDafny:
-    def __init__(self, ioa_file: io.StringIO, k=1):
-        if k <= 0:
+    def __init__(self, ioa_file: io.StringIO, k=0):
+        if k < 0:
             raise ValueError("Steps for invariant proof must be positive.")
 
         self.__ioa_file = ioa_file
@@ -169,7 +169,7 @@ class _IOANamespace:
 
 class _ToDafnyVisitor(IOAAstVisitor):
     def __init__(self, ns: _IOANamespace, k: int):
-        assert k > 0
+        assert 0 <= k
         super().__init__()
         self.__k_steps = k
         self.__parameters = None
@@ -276,8 +276,8 @@ class _ToDafnyVisitor(IOAAstVisitor):
     def __lemma_bmc(self) -> str:
         k = self.__k_steps
         arg_list = \
-            ["s"+str(i) + ": State" for i in range(0, k)] + \
-            ["a"+str(i) + ": Action" for i in range(1, k)]
+            ["s"+str(i) + ": State" for i in range(0, k+1)] + \
+            ["a"+str(i) + ": Action" for i in range(1, k+1)]
         if self.__parameters:
             arg_list.append("para: Parameter")
 
@@ -294,20 +294,20 @@ class _ToDafnyVisitor(IOAAstVisitor):
             self.__func_name_args(
                 IOA.TRANSITIONS, type_hint=False,
                 curr_s="s"+str(i), act="a"+str(i+1), next_s="s"+str(i+1))
-            for i in range(0, k-1)
+            for i in range(0, k)
         ] + [
             "ensures " +
             self.__func_name_args(
                 IOA.INVARIANT_OF, type_hint=False, curr_s="s" + str(i))
-            for i in range(0, k)
+            for i in range(0, k+1)
         ]
         return "\n".join(ret_list) + self.__body_block("", True)
 
     def __lemma_induction(self) -> str:
         k = self.__k_steps
         arg_list = \
-            ["s"+str(i) + ": State" for i in range(0, k+1)] + \
-            ["a"+str(i) + ": Action" for i in range(1, k+1)]
+            ["s"+str(i) + ": State" for i in range(0, k+2)] + \
+            ["a"+str(i) + ": Action" for i in range(1, k+2)]
         if self.__parameters:
             arg_list.append("para: Parameter")
 
@@ -323,12 +323,12 @@ class _ToDafnyVisitor(IOAAstVisitor):
             self.__func_name_args(
                 IOA.TRANSITIONS, type_hint=False,
                 curr_s="s"+str(i), act="a"+str(i+1), next_s="s"+str(i+1))
-            for i in range(0, k)
+            for i in range(0, k+1)
         ]
         ret_list.append(
             "ensures " +
             self.__func_name_args(
-                IOA.INVARIANT_OF, type_hint=False, curr_s="s" + str(k))
+                IOA.INVARIANT_OF, type_hint=False, curr_s="s" + str(k+1))
         )
         return "\n".join(ret_list) + self.__body_block("", True)
 
