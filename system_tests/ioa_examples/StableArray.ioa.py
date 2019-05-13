@@ -12,7 +12,8 @@ def StableArray(N: int):
 
     class states:
         s: Seq[Status]
-    initially = len(s) == N and (s[0] == 1 or s[0] == 3) and (s[N-1] == 0 or s[N-1] == 2)
+    initially = len(s) == N and (s[0] == 1 or s[0] == 3) and (s[N-1] == 0 or s[N-1] == 2) \
+        and len({i for i in range(0, N) if ((i!=0 and s[i-1]==incre(s[i])) or (i!=N-1 and s[i+1]==incre(s[i])))})
 
     class transitions:
         @output

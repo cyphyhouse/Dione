@@ -364,6 +364,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
     def visit_ListComp(self, exp: ast.ListComp) -> str:
         # FIXME maybe we can visit generators
+        #  to merge common part in SetComp and ListComp
         assert exp.generators
         assert len(exp.generators) == 1  # TODO support multiple generators
         for gen in exp.generators:
@@ -385,7 +386,36 @@ class _ToDafnyVisitor(IOAAstVisitor):
                mapped + ", " + sequence + ")"
         raise NotImplementedError("List comprehension expression is not supported yet")
 
-    def visit_SetComp(self, exp):
+    def visit_SetComp(self, exp: ast.SetComp) -> str:
+        # FIXME maybe we can visit generators
+        #  to merge common part in SetComp and ListComp
+        assert exp.generators
+        assert len(exp.generators) == 1  # TODO support multiple generators
+        for gen in exp.generators:
+            assert isinstance(gen.target, ast.Name)  # TODO support multiple bounded variables
+            var = self.visit(gen.target)
+            sequence = self.visit(gen.iter)
+            if gen.ifs:
+                # Set namespace
+                bounded_vars = [var]
+                self._current_namespace.enter_quantification(bounded_vars)
+
+                condition = "&&".join(map(self.visit, gen.ifs))
+
+                # Reset namespace
+                self._current_namespace.exit()
+
+        # Set namespace
+        bounded_vars = [var]
+        self._current_namespace.enter_quantification(bounded_vars)
+
+        mapped = self.visit(exp.elt)
+
+        # Reset namespace
+        self._current_namespace.exit()
+
+        return "(set " + var + " | " + var + " in " + sequence + "&&" + condition + \
+            " :: " + mapped + ")"
         raise NotImplementedError("Set comprehension expression is not supported yet")
 
     def visit_DictComp(self, exp):
