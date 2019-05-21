@@ -6,8 +6,8 @@ Verification with Synchronizer models
 
 + Provide two semantics for the same (restricted) IOA language
 
-    - Execution on synchronous network environment
-    - Execution with synchronizers on asynchronous network environment
+    * Execution on synchronous network environment
+    * Execution with synchronizers on asynchronous network environment
 
 + Prove simulation(?) between asynchronous implementation and
   synchronous algorithm wrapped with synchronizers
@@ -26,14 +26,13 @@ Maybe we can claim that, under our framework,
    + We can provide tests or assertions for AsynAlg based on (SynAlg || Synchronizer)
 
 3. Perhaps we can provide proof if AsynAlg is designed according to SynAlg
-   (SynAlg || Synchronizer) ~ AsynAlg
 
-   + Simulation proof
+   + Simulation proof: (SynAlg || Synchronizer) ~ AsynAlg
    + Prove ∀ fair trace t1 in Tr(AsynAlg),
      ∃ fair trace t2 in Tr(AsynAlg)
 
-     - t2 is a reordering of t1 preserving Happens-Before partial order
-     - t2 in Tr(SynAlg || Synchronizer)
+     * t2 is a reordering of t1 preserving Happens-Before partial order
+     * t2 in Tr(SynAlg || Synchronizer)
 
 
 Evaluation Subjects
