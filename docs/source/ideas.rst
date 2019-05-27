@@ -6,8 +6,8 @@ Verification with Synchronizer models
 
 + Provide two semantics for the same (restricted) IOA language
 
-    * Execution on synchronous network environment
-    * Execution with synchronizers on asynchronous network environment
+  * Execution on synchronous network environment
+  * Execution with synchronizers on asynchronous network environment
 
 + Prove simulation(?) between asynchronous implementation and
   synchronous algorithm wrapped with synchronizers
@@ -18,8 +18,8 @@ Contributions
 
 Maybe we can claim that, under our framework,
 
-1. Users can model a synchronous algorithm, SynAlg,
-   and prove against synchronous network as well as synchronizer over asynchronous
+1. Users can model a synchronous algorithm, SynAlg, and prove against synchronous network
+   as well as synchronizer over reliable asynchronous network
 
 2. Provide a golden reference for comparing with the asynchronous version, AsynAlg
 
@@ -42,6 +42,15 @@ Evaluation Subjects
 
 + Self-stabilizing Mutual Exclusions
 
-    - Ring, Bidirectional Array (Synchronized version)
-    - Do we need asynchronous versions of the algorithm?
+  * Ring, Bidirectional Array (Synchronized version)
+  * Do we need asynchronous versions of the algorithms?
+
+
+Weak Synchrony Assumptions
+--------------------------
+
++ Should we consider extending our framework to support modeling for weakly synchronous
+  network?
++ Prof. Elaine Shi's recent paper
+  "Synchronous, with a Chance of Partition Tolerance"
 
