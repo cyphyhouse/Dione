@@ -13,8 +13,32 @@ Verification with Synchronizer models
   synchronous algorithm wrapped with synchronizers
 
 
-Contributions
--------------
+Theoretical Contributions
+-------------------------
+
+Given a user defined **synchronous IOA**, A_pgm, and network topology, G,
+we provide two semantics
+
+S_sync = A_pgm || B_sync(G)
+S_async = A_pgm || H(G) || B_async(G)
+
+where H is the synchronizer
+
+Theorem. ∀ A_pgm, S_sync ~ S_async
+
+
+Technical Contributions
+-----------------------
+
+Tool support for
+
+1. Constraint on A_pgm to be applied with synchronizers
+
+2. Invariant checking for S_sync
+
+
+Applications
+------------
 
 Maybe we can claim that, under our framework,
 
