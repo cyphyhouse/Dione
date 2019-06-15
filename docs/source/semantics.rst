@@ -10,12 +10,14 @@ Assuming a given network topology, G = (V, E) where V = {1, ..., n} and
 E ⊆ V × V for simplicity.
 We can easily treat V and E as data types.
 
-Given a specific node ``i`` ∈ V, the automaton definition will be parsed into ``C_i``
+Given a specific node ``i`` ∈ V, the automaton definition will be instantiated into
+an agent configuration ``C_i``
 with the message generation function ``msg_gen`` and the transition function ``trans``.
+Also ``s`` should store the current state for the agent.
+``r`` represents what the agent thinks the current round is.
 
 There should be standard rules to construct ``msg_gen`` and ``trans``,
 but we skipped it for now.
-
 
 Some issues not addressed:
 
@@ -26,7 +28,7 @@ Some issues not addressed:
 
                  ... TODO ...
     ---------------------------------------- AutDef
-    (AutDef, ⊥, ∅, 0) --> (., {C_i}, ∅, 0)
+    (AutDef, ⊥, ∅) --> ("", {C_i}, ∅)
 
     C_i: MsgGen × Transition × State × ℕ
     C_i = (msg_gen, trans, s, r)
@@ -46,7 +48,7 @@ The system is deterministic and will never stop.
 .. code-block::
 
     ----------------------------------------- Init
-    (., {C_i}, ∅) --> ("all send", {C_i}, ∅)
+    ("", {C_i}, ∅) --> ("all send", {C_i}, ∅)
 
 
     tagged_msgs = { (i, dst, m) | m = C_i.msg_gen(C_i.s, dst) }
@@ -76,7 +78,7 @@ Asynchronous Network with Synchronizer Semantics
 .. code-block::
 
     ------------------------------------- Init
-    (., {C_i}, ∅) --> ("all send", {C_i}, ∅)
+    ("", {C_i}, ∅) --> ("all send", {C_i}, ∅)
 
 
 
@@ -85,7 +87,7 @@ Asynchronous Network with Synchronizer Semantics
 
 
     ----------------------------------------
-    (recv, ) --> (send, tr.append("recv"))
+    ("all recv", ) --> ("all send", )
 
 
 
