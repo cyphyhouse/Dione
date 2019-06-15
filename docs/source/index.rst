@@ -11,6 +11,7 @@ Welcome to Dione's documentation!
    :caption: Contents:
 
    ideas.rst
+   semantics.rst
 
 Indices and tables
 ==================
