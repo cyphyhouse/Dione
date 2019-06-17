@@ -56,7 +56,8 @@ and internal transition.
     ("", {C_i}, ∅) --> ("all send", {C_i}, ∅)
 
 
-    tagged_msgs = { (i, dst) |-> m | m = C_i.msg_gen(C_i.s, dst) }
+    tagged_msgs : Map[V × V, Msg]
+    tagged_msgs = { (i, dst) -> m | m = C_i.msg_gen(C_i.s, dst) }
                                                       for all i
     ----------------------------------------------------------- AllSend
       ("all send", {C_i}, ∅) --> ("env", {C_i}, tagged_msgs)
@@ -67,33 +68,63 @@ and internal transition.
     ("env", {C_i}, msgs) --> ("all recv", {C_i}, msgs')
 
 
-      msgs_to_i = { src |-> m | ((src, i) |-> m) ∈ tagged_msgs },
+      msgs_to_i = { src -> m | ((src, i) -> m) ∈ tagged_msgs },
          C_i'.s = C_i.trans(C_i.s, msgs_to_i),
          C_i'.r = C_i.r + 1
     ------------------------------------------------------------ AllRecv
     ("all recv", {C_i}, tagged_msgs) --> ("all send", {C_i'}, ∅)
 
 
-Asynchronous Network with Synchronizer Semantics
-------------------------------------------------
+Asynchronous Network Semantics
+------------------------------
 
 .. todo::
-    Asynchronous semantics with Synchronizer
+
+    How to allow both send and receive as the next action
+
+
+.. code-block::
+
+            m = C_i.msg_gen(C_i.s, dst)
+    ------------------------------------------- Init
+    ("", {C_i}, ∅) --> ("send i dst", {C_i}, ∅)
+
+
+                       m = C_i.msg_gen(C_i.s, dst),
+           msgs'[i, dst] = msgs[i, dst].append(m)
+    ----------------------------------------------------- Send
+    ("send i dst", {C_i}, msgs) --> ("env", {C_i}, msgs')
+
+
+               msgs[src, i] is not empty,
+    ----------------------------------------------------- Env
+    ("env", {C_i}, msgs) --> ("recv src i", {C_i}, msgs)
+
+
+           msgs[src, i] != empty,
+           msgs'[src, i] = msgs[src, i].pop()
+    ----------------------------------------------------- Recv
+    ("recv src i", {C_i}, msgs) --> ("env", {C_i}, msgs')
+
+
+Asynchronous Network with Global Synchronizer
+---------------------------------------------
+
+With global synchronizer, one
 
 .. code-block::
 
     ------------------------------------- Init
-    ("", {C_i}, ∅) --> ("all send", {C_i}, ∅)
+    ("", {C_i}, ∅) --> ("send", {C_i}, ∅)
 
 
 
     ----------------------------------------
-    ("all send", {C_i}, ∅) --> ()
+    ("send", {C_i}, ∅) --> ("")
 
 
     ----------------------------------------
     ("all recv", ) --> ("all send", )
-
 
 
 Specifying Network Topology
