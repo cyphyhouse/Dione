@@ -45,15 +45,20 @@ Synchronous Network Semantics
 Synchronous semantics simply repeats the three rules, Send, Env, and Recv, in order.
 The system is deterministic and will never stop.
 
+Notice that in ``AllRecv`` rule, ``msgs_to_i`` is computed and used in ``trans``
+right away to avoid storing it in a local variable for each agent.
+Another option is to store it locally so that we can cleanly separate receiving
+and internal transition.
+
 .. code-block::
 
     ----------------------------------------- Init
     ("", {C_i}, ∅) --> ("all send", {C_i}, ∅)
 
 
-    tagged_msgs = { (i, dst, m) | m = C_i.msg_gen(C_i.s, dst) }
+    tagged_msgs = { (i, dst) |-> m | m = C_i.msg_gen(C_i.s, dst) }
                                                       for all i
-    ----------------------------------------------------------- Send
+    ----------------------------------------------------------- AllSend
       ("all send", {C_i}, ∅) --> ("env", {C_i}, tagged_msgs)
 
 
@@ -62,10 +67,10 @@ The system is deterministic and will never stop.
     ("env", {C_i}, msgs) --> ("all recv", {C_i}, msgs')
 
 
-      msgs_to_i = { src |-> m | (src, i, m) ∈ tagged_msgs },
+      msgs_to_i = { src |-> m | ((src, i) |-> m) ∈ tagged_msgs },
          C_i'.s = C_i.trans(C_i.s, msgs_to_i),
          C_i'.r = C_i.r + 1
-    ------------------------------------------------------------ Recv
+    ------------------------------------------------------------ AllRecv
     ("all recv", {C_i}, tagged_msgs) --> ("all send", {C_i'}, ∅)
 
 
