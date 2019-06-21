@@ -9,7 +9,7 @@ TODO
 
 ## Modeling Language
 
-TODO
+See [Language Reference](docs/source/language.rst)
 
 ## Invariant Checking
 
