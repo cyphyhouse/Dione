@@ -2,13 +2,32 @@
 Semantics
 =========
 
-
-Program/Automaton Definition Semantics
---------------------------------------
+Network Topology
+****************
 
 Assuming a given network topology, G = (V, E) where V = {1, ..., n} and
 E ⊆ V × V for simplicity.
 We can easily treat V and E as data types.
+
+Specifying Network Topology
+---------------------------
+
+.. todo::
+
+    We can also provide syntax for specifying network topology before automaton definition
+
+.. code-block::
+
+                 ... TODO...
+    ---------------------------------------------- GraphDef
+    (GraphDef AutDef, ., .) --> (AutDef, G, .)
+
+
+Synchronous Model
+*****************
+
+Synchronous Algorithm Semantics
+-------------------------------
 
 Given a specific node ``i`` ∈ V, the automaton definition will be instantiated into
 an agent configuration ``C_i``
@@ -28,9 +47,10 @@ Some issues not addressed:
 
                  ... TODO ...
     ---------------------------------------- AutDef
-    (AutDef, ⊥, ∅) --> ("", {C_i}, ∅)
+    (AutDef, ⊥, ∅, R=0) --> ("", {C_i}, ∅, R=0)
 
-    C_i: MsgGen × Transition × State × ℕ
+    # Agent Configuration
+    C_i : MsgGen × Transition × State × ℕ
     C_i = (msg_gen, trans, s, r)
 
     type State = Var -> Val
@@ -42,69 +62,92 @@ Some issues not addressed:
 Synchronous Network Semantics
 -----------------------------
 
-Synchronous semantics simply repeats the three rules, Send, Env, and Recv, in order.
+Synchronous semantics simply repeats the two rules, AllSend and AllRecv, in order.
 The system is deterministic and will never stop.
 
-Notice that in ``AllRecv`` rule, ``msgs_to_i`` is computed and used in ``trans``
+In ``AllSendToAll`` rule, ``all_msgs`` only holds at most one message for now.
+One can modified the rule to model channels with message loss.
+
+Notice that in ``AllRecvFromAll`` rule, ``all_msgs`` are cleaned after delivered.
+Also ``msgs_to_i`` is computed and used in ``trans``
 right away to avoid storing it in a local variable for each agent.
 Another option is to store it locally so that we can cleanly separate receiving
 and internal transition.
 
 .. code-block::
 
-    ----------------------------------------- Init
-    ("", {C_i}, ∅) --> ("all send", {C_i}, ∅)
+    # System Configuration
+    conf : (V -> AgentConf) × Map[V × V, Msg] × ℕ
+    conf = ({C_i}, msgs, R)
+
+    msgs = { (i, dst) -> m | m = C_i.msg_gen(C_i.s, dst)
+                                         for i, dst in V },
+        C_i.r = R
+    ------------------------------------------------------- AllSendToAll
+              ({C_i}, ∅, R) --> ({C_i}, msgs, R+1)
 
 
-    tagged_msgs : Map[V × V, Msg]
-    tagged_msgs = { (i, dst) -> m | m = C_i.msg_gen(C_i.s, dst) }
-                                                      for all i
-    ----------------------------------------------------------- AllSend
-      ("all send", {C_i}, ∅) --> ("env", {C_i}, tagged_msgs)
+    msgs_to_i = { src -> m | ((src, i) -> m) ∈ msgs },
+       C_i'.s = C_i.trans(C_i.s, msgs_to_i),
+       C_i'.r = R
+    -------------------------------------------------- AllRecvFromAll
+           ({C_i}, msgs, R) --> ({C_i'}, ∅, R)
 
 
-        msgs' = drop/duplicate/fake msgs
-    --------------------------------------------------- Env
-    ("env", {C_i}, msgs) --> ("all recv", {C_i}, msgs')
+Asynchronous Model
+******************
 
+Asynchronous Al
 
-      msgs_to_i = { src -> m | ((src, i) -> m) ∈ tagged_msgs },
-         C_i'.s = C_i.trans(C_i.s, msgs_to_i),
-         C_i'.r = C_i.r + 1
-    ------------------------------------------------------------ AllRecv
-    ("all recv", {C_i}, tagged_msgs) --> ("all send", {C_i'}, ∅)
 
 
 Asynchronous Network Semantics
 ------------------------------
 
-.. todo::
+It seems interpreting a synchronous algorithm with asynchronous network
+does not make much sense.
+We can only define an arbitrary message delivery model and a memory model
+for updating states with transition function.
 
-    How to allow both send and receive as the next action
+Since transition function ``Ci.trans`` takes all messages delivered to
+``i`` as arguments, we can choose
 
+There are several options for ``Recv`` rule regarding
+how many messages are delivered at the same time.
+
+1. Deliver one message from one ``src`` node a time.
+   More precisely, only pop the top of the ``(src, i)`` queue.
+
+2. Deliver the oldest message to ``i`` for each source agent.
+   More precisely, pop all the top of the ``(_, i)`` queue,
+   and aggregate them.
+
+3. Deliver all messages in queue sent to ``i`` (Weird)
+
+The ``Recv`` rule below is specifying option 2.
+It is obvious that the messages expected by agent ``i``
+for transition may have not been sent yet,
+and therefore executing the algorithm will have different behavior.
 
 .. code-block::
 
-            m = C_i.msg_gen(C_i.s, dst)
-    ------------------------------------------- Init
-    ("", {C_i}, ∅) --> ("send i dst", {C_i}, ∅)
+    # System Configuration
+    conf : (V -> AgentConf) × Map[V × V, Queue[Msg]]
+    conf = ({C_i}, msgs)
 
 
-                       m = C_i.msg_gen(C_i.s, dst),
-           msgs'[i, dst] = msgs[i, dst].append(m)
-    ----------------------------------------------------- Send
-    ("send i dst", {C_i}, msgs) --> ("env", {C_i}, msgs')
+                 m = C_i.msg_gen(C_i.s, dst),
+     msgs'[i, dst] = msgs[i, dst].append(m)
+    ---------------------------------------- Send
+        ({C_i}, msgs) --> ({C_i}, msgs')
 
 
-               msgs[src, i] is not empty,
-    ----------------------------------------------------- Env
-    ("env", {C_i}, msgs) --> ("recv src i", {C_i}, msgs)
-
-
-           msgs[src, i] != empty,
-           msgs'[src, i] = msgs[src, i].pop()
-    ----------------------------------------------------- Recv
-    ("recv src i", {C_i}, msgs) --> ("env", {C_i}, msgs')
+    msgs_to_i = { src -> m | msgs[src, i] != ∅ &&
+                             m = msgs[src, i].top() },
+       C_i'.s = C_i.trans(C_i.s, msgs_to_i),
+    msgs'[src, i] = msgs[src, i].pop()
+    -------------------------------------------------- Recv
+            ({C_i}, msgs) --> ({C_i'}, msgs')
 
 
 Asynchronous Network with Global Synchronizer
@@ -114,26 +157,11 @@ With global synchronizer, one
 
 .. code-block::
 
-    ------------------------------------- Init
-    ("", {C_i}, ∅) --> ("send", {C_i}, ∅)
+    --------------------------------- AllSend
+    ({C_i}, ∅, R) --> ({C_i}, ∅, R+1)
 
 
 
-    ----------------------------------------
-    ("send", {C_i}, ∅) --> ("")
+    ------------------------------- AllRecv
+    ({C_i}, ∅, R) --> ({C_i}, ∅, R)
 
-
-    ----------------------------------------
-    ("all recv", ) --> ("all send", )
-
-
-Specifying Network Topology
----------------------------
-
-We can also provide syntax for specifying network topology before automaton definition
-
-.. code-block::
-
-                 ... TODO...
-    ---------------------------------------------- GraphDef
-    (GraphDef AutDef, ., .) --> (AutDef, G, .)
