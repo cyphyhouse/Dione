@@ -62,7 +62,7 @@ Some issues not addressed:
 Synchronous Network Semantics
 -----------------------------
 
-Synchronous semantics simply repeats the two rules, AllSend and AllRecv, in order.
+Synchronous semantics simply repeats the two rules, ``AllSend`` and ``AllRecv``, in order.
 The system is deterministic and will never stop.
 
 In ``AllSendToAll`` rule, ``all_msgs`` only holds at most one message for now.
@@ -80,26 +80,63 @@ and internal transition.
     conf : (V -> AgentConf) × Map[V × V, Msg] × ℕ
     conf = ({C_i}, msgs, R)
 
-    msgs = { (i, dst) -> m | m = C_i.msg_gen(C_i.s, dst)
-                                         for i, dst in V },
+    ∀ i ∈ V,
         C_i.r = R
-    ------------------------------------------------------- AllSendToAll
+      ∧ ∀ dst ∈ V,
+            msgs = { (i, dst) -> m | m = C_i.msg_gen(C_i.s, dst) }
+    -------------------------------------------------------------- AllSendToAll
               ({C_i}, ∅, R) --> ({C_i}, msgs, R+1)
 
 
-    msgs_to_i = { src -> m | ((src, i) -> m) ∈ msgs },
-       C_i'.s = C_i.trans(C_i.s, msgs_to_i),
-       C_i'.r = R
-    -------------------------------------------------- AllRecvFromAll
+    ∀ src ∈ V, i ∈ V,
+        msgs_to_i = { src -> m | ((src, i) -> m) ∈ msgs }
+      ∧ C_i'.s = C_i.trans(C_i.s, msgs_to_i),
+      ∧ C_i'.r = R
+    ----------------------------------------------------- AllRecvFromAll
            ({C_i}, msgs, R) --> ({C_i'}, ∅, R)
 
 
 Asynchronous Model
 ******************
 
-Asynchronous Al
+Asynchronous Network with Global Synchronizer
+---------------------------------------------
+
+With global synchronizer, one
+
+.. code-block::
+
+    # System Configuration
+    conf : (V -> AgentConf) × (V × V × ℕ -> Msg) × (V × ℕ -> Bool) × (V × ℕ -> bool)
+    conf = ({C_i}, tray, user_sent, user_rcvd)
+
+    ∃ i ∈ V,
+        ∀ j ∈ V, user_rcvd(j, C_i.r - 1) = true    # User automaton
+      ∧ user_sent(i, C_i.r) = false                # User automaton
+      ∧ user_sent' = user_sent[(i, C_i.r) := true]
+      ∧ ∀ dst ∈ V,
+            # TODO constraints for stroing messages to tray
+    --------------------------------------------------------------- iSendToAll
+    ({C_i}, tray, user_sent, user_rcvd)
+    --> ({C_i'}, tray', user_sent', user_rcvd)
 
 
+
+    ∃ i ∈ V,
+        ∀ j ∈ V, user_sent(j, C_i.r) = true
+      ∧ user_rcvd(i, C_i.r) = false
+      ∧ user_rcvd' = user_rcvd[(i, C_i.r) := false]
+      ∧ ∀ dst ∈ V,
+            # TODO constraints to deliver messages
+    ----------------------------------------------- iRecvFromAll
+    ({C_i}, tray, user_sent, user_rcvd)
+    --> ({C_i}, tray, user_sent, user_rcvd')
+
+.. todo::
+
+    Note that user_sent(i, r) = false ∧ user_rcvd(i, r) = true is an invalid
+    configuration.
+    We might want to merge them into one variable with three states.
 
 Asynchronous Network Semantics
 ------------------------------
@@ -109,7 +146,7 @@ does not make much sense.
 We can only define an arbitrary message delivery model and a memory model
 for updating states with transition function.
 
-Since transition function ``Ci.trans`` takes all messages delivered to
+Since transition function ``C_i.trans`` takes all messages delivered to
 ``i`` as arguments, we can choose
 
 There are several options for ``Recv`` rule regarding
@@ -129,10 +166,14 @@ It is obvious that the messages expected by agent ``i``
 for transition may have not been sent yet,
 and therefore executing the algorithm will have different behavior.
 
+.. todo::
+
+    Finish the semantic rules
+
 .. code-block::
 
     # System Configuration
-    conf : (V -> AgentConf) × Map[V × V, Queue[Msg]]
+    conf : {AgentConf_i} × Map[V × V, Queue[Msg]]
     conf = ({C_i}, msgs)
 
 
@@ -148,20 +189,3 @@ and therefore executing the algorithm will have different behavior.
     msgs'[src, i] = msgs[src, i].pop()
     -------------------------------------------------- Recv
             ({C_i}, msgs) --> ({C_i'}, msgs')
-
-
-Asynchronous Network with Global Synchronizer
----------------------------------------------
-
-With global synchronizer, one
-
-.. code-block::
-
-    --------------------------------- AllSend
-    ({C_i}, ∅, R) --> ({C_i}, ∅, R+1)
-
-
-
-    ------------------------------- AllRecv
-    ({C_i}, ∅, R) --> ({C_i}, ∅, R)
-
