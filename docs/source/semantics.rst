@@ -111,26 +111,27 @@ With global synchronizer, one
     conf = ({C_i}, tray, user_sent, user_rcvd)
 
     ∃ i ∈ V,
-        ∀ j ∈ V, user_rcvd(j, C_i.r - 1) = true    # User automaton
-      ∧ user_sent(i, C_i.r) = false                # User automaton
-      ∧ user_sent' = user_sent[(i, C_i.r) := true]
+        ∀ j ∈ V, user_rcvd(j, C_i.r) = true    # User automaton
+      ∧ user_sent(i, C_i.r + 1) = false                # User automaton
+      ∧ user_sent' = user_sent[(i, C_i.r + 1) := true]
       ∧ ∀ dst ∈ V,
             # TODO constraints for stroing messages to tray
     --------------------------------------------------------------- iSendToAll
     ({C_i}, tray, user_sent, user_rcvd)
-    --> ({C_i'}, tray', user_sent', user_rcvd)
+    --> ({C_i}, tray', user_sent', user_rcvd)
 
 
 
     ∃ i ∈ V,
-        ∀ j ∈ V, user_sent(j, C_i.r) = true
-      ∧ user_rcvd(i, C_i.r) = false
-      ∧ user_rcvd' = user_rcvd[(i, C_i.r) := false]
+        ∀ j ∈ V, user_sent(j, C_i.r + 1) = true
+      ∧ user_rcvd(i, C_i.r + 1) = false
+      ∧ user_rcvd' = user_rcvd[(i, C_i.r + 1) := true]
+      ∧ C_i'.r = C_i.r + 1
       ∧ ∀ dst ∈ V,
             # TODO constraints to deliver messages
     ----------------------------------------------- iRecvFromAll
     ({C_i}, tray, user_sent, user_rcvd)
-    --> ({C_i}, tray, user_sent, user_rcvd')
+    --> ({C_i'}, tray, user_sent, user_rcvd')
 
 .. todo::
 
