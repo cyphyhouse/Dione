@@ -7,10 +7,10 @@ class ProverInterface(abc.ABC):
     def __init__(self):
         pass
 
-    def __enter__(self):
+    async def __aenter__(self):
         pass
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
         pass
 
     @abc.abstractmethod

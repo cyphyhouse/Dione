@@ -10,6 +10,7 @@ from dione.verification_engine.prover_interface import ProverInterface
 
 class ProverDafny(ProverInterface):
     def __init__(self, dafny_server_exe):
+        super(ProverDafny, self).__init__()
         self.__dfy_exe = dafny_server_exe
         self.proc = None
 
