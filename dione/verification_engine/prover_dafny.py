@@ -5,7 +5,7 @@ import base64
 import json
 import re
 
-from src.verification_engine.prover_interface import ProverInterface
+from dione.verification_engine.prover_interface import ProverInterface
 
 
 class ProverDafny(ProverInterface):

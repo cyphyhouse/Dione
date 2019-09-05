@@ -6,8 +6,8 @@ import configparser
 import os
 import sys
 
-from src.frontend.translator_dafny import TranslatorDafny
-from src.verification_engine.prover_dafny import ProverDafny
+from dione.frontend.translator_dafny import TranslatorDafny
+from dione.verification_engine.prover_dafny import ProverDafny
 
 
 async def run(options):

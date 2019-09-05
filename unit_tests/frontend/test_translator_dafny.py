@@ -2,8 +2,8 @@ import ast
 import symtable
 import unittest
 
-from src.frontend.ioa_constructs import IOA, IOAScopeHandler
-from src.frontend.translator_dafny import _IOANamespace, _ToDafnyVisitor
+from dione.frontend.ioa_constructs import IOA, IOAScopeHandler
+from dione.frontend.translator_dafny import _IOANamespace, _ToDafnyVisitor
 
 _test_ioa = """
 @automaton

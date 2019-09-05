@@ -6,7 +6,7 @@ import abc
 import ast
 from typing import List, Optional
 
-from src.frontend.ioa_constructs import IOA, IOAScope, IOAScopeHandler
+from dione.frontend.ioa_constructs import IOA, IOAScope, IOAScopeHandler
 
 
 # TODO Decide in each visit function whether we give user AST root node itself
@@ -234,6 +234,9 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         pass
 
     def visit_Select(self, exp):
+        pass
+
+    def visit_comprehension(self, comprehension):
         pass
 
     def visit_arguments(self, arguments):

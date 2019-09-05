@@ -1,6 +1,6 @@
 import unittest
 
-from src.frontend.ioa_constructs import IOA, IOAScope, IOAScopeHandler
+from dione.frontend.ioa_constructs import IOA, IOAScope, IOAScopeHandler
 
 class TestIOAScope(unittest.TestCase):
     # TODO

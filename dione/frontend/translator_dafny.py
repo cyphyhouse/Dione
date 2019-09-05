@@ -5,8 +5,8 @@ import io
 import symtable
 from typing import List, Optional, Tuple
 
-from src.frontend.ioa_ast_visitor import IOAAstVisitor
-from src.frontend.ioa_constructs import IOA
+from dione.frontend.ioa_ast_visitor import IOAAstVisitor
+from dione.frontend.ioa_constructs import IOA
 
 
 class TranslatorDafny:
@@ -384,7 +384,6 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
         return "applyMapSeq(map " + var + " | " + var + " in " + sequence + " :: " + \
                mapped + ", " + sequence + ")"
-        raise NotImplementedError("List comprehension expression is not supported yet")
 
     def visit_SetComp(self, exp: ast.SetComp) -> str:
         # FIXME maybe we can visit generators

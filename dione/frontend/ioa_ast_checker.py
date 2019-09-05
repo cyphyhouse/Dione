@@ -4,8 +4,8 @@
 
 import ast
 
-from src.frontend.ioa_constructs import IOA
-from src.frontend.ioa_ast_visitor import IOAAstVisitor
+from dione.frontend.ioa_constructs import IOA
+from dione.frontend.ioa_ast_visitor import IOAAstVisitor
 
 
 class IOAAstChecker(IOAAstVisitor):

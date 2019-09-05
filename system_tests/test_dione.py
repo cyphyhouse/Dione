@@ -1,7 +1,7 @@
 import ast
 
-from src.frontend.ioa_ast_checker import IOAAstChecker
-from src.frontend.translator_dafny import TranslatorDafny
+from dione.frontend.ioa_ast_checker import IOAAstChecker
+from dione.frontend.translator_dafny import TranslatorDafny
 
 with open("system_tests/ioa_examples/AsyncLCR.ioa.py") as file:
     tree = ast.parse(file.read())
