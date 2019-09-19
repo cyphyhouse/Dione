@@ -20,7 +20,6 @@ class ProverDafny(ProverInterface):
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            text=True
         )
         return self
 
