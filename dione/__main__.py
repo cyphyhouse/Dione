@@ -3,7 +3,6 @@
 import argparse
 import asyncio
 import configparser
-import os
 import sys
 
 from dione.frontend.translator_dafny import TranslatorDafny
@@ -82,11 +81,13 @@ def parse_options(args):
 
 
 def __check_file(p: str):
-    if not os.path.isfile(p):
+    from pathlib import Path
+    f = Path(p).expanduser()
+    if not f.is_file():
         raise argparse.ArgumentTypeError(    # FIXME default config file name
             "Path specified in setup.cfg or cmdline \"" + p + "\" is not a file")
 
-    return os.path.abspath(p)
+    return str(f.resolve())
 
 
 if __name__ == "__main__":
