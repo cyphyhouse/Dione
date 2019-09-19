@@ -51,7 +51,7 @@ def parse_options(args):
     conf_parser.add_argument("-c", "--conf",
                              type=argparse.FileType('r'),
                              help="Specify config file",
-                             default="setup.cfg"  # FIXME default config file name
+                             default="setup.cfg"
                              )
     args, remaining_argv = conf_parser.parse_known_args()
 
@@ -71,6 +71,14 @@ def parse_options(args):
         )
     parser.set_defaults(**defaults)
     parser.add_argument('ioa', type=argparse.FileType('r'), help='Input IOA file')
+
+    def __check_file(p: str):
+        from pathlib import Path
+        f = Path(p).expanduser()
+        if not f.is_file():
+            raise argparse.ArgumentTypeError(
+                "Path \"" + p + "\" specified by " + args.conf.name + " or cmdline is not a file")
+        return str(f.resolve())
     parser.add_argument(
         "--dafny_server",
         help="Specify executable dafny-server or DafnyServer.exe",
@@ -78,16 +86,6 @@ def parse_options(args):
     )
 
     return parser.parse_args(remaining_argv)
-
-
-def __check_file(p: str):
-    from pathlib import Path
-    f = Path(p).expanduser()
-    if not f.is_file():
-        raise argparse.ArgumentTypeError(    # FIXME default config file name
-            "Path specified in setup.cfg or cmdline \"" + p + "\" is not a file")
-
-    return str(f.resolve())
 
 
 if __name__ == "__main__":
