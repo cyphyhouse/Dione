@@ -2,9 +2,15 @@ from enum import Enum, auto, unique
 
 
 class AutoName(Enum):
-    def _generate_next_value_(self, start, count, last_values):
+    def _generate_next_value_(self, start, count, last_values) -> str:
         assert isinstance(self, str)
-        return self.lower()
+        region_sep = "_REGION_INTERNAL"
+        if self != region_sep and \
+                ("$" + region_sep.lower()) not in last_values:
+            # reserved words
+            return self.lower()
+        # else: # internal structs
+        return "$" + self.lower()
 
 
 @unique
@@ -19,7 +25,7 @@ class IOA(AutoName):
         except KeyError:
             return default
 
-    # reserved words
+    # region reserved words
     AUTOMATON = auto()
     COMPONENTS = auto()
     COMPOSITION = auto()
@@ -42,21 +48,24 @@ class IOA(AutoName):
     TRANSITIONS = auto()
     TYPE = auto()
     WHERE = auto()
-    # internal syntax constructs
-    AUTOMATON_INSTANCE = "$automaton_instance"
-    ASSIGN = "$assign"
-    DECL_COMPONENT = "$decl_component"
-    DECL_VAR = "$decl_decl_var"
-    FORMAL_ACT = "$formal_act"
-    FORMAL_PARA_LIST = "$formal_parameter_list"
-    FORMAL_PARA = "$formal_parameter"
-    ACTUAL_PARA_LIST = "$actual_parameter_list"
-    ACTUAL_PARA = "$actual_parameter"
-    IDENTIFIER = "$identifier"
-    IOA_SPEC = "$ioa_spec"
-    SHORTHAND = "$shorthand"
-    TRANSITION = "$transition"
-    TYPE_DEF = "$type_def"
+    # endregion
+    _REGION_INTERNAL = auto()
+    # region internal syntax constructs. This must be after __REGION_INTERNAL
+    ASSIGN = auto()
+    AUTOMATON_INSTANCE = auto()
+    DECL_COMPONENT = auto()
+    DECL_VAR = auto()
+    FORMAL_ACT = auto()
+    FORMAL_PARA_LIST = auto()
+    FORMAL_PARA = auto()
+    ACTUAL_PARA_LIST = auto()
+    ACTUAL_PARA = auto()
+    IDENTIFIER = auto()
+    IOA_SPEC = auto()
+    SHORTHAND = auto()
+    TRANSITION = auto()
+    TYPE_DEF = auto()
+    # endregion
 
 
 class IOAScope:
