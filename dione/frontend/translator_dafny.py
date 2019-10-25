@@ -629,7 +629,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
     # endregion
 
     # region IOA specific language constructs visitors
-    def visit_IOASpec(self, spec: ast.Module) -> str:
+    def visit_ioa_spec(self, spec: ast.Module) -> str:
         stmt_list = list(map(self.visit, spec.body))
 
         type_def_list, rem_list = [], []
@@ -655,7 +655,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
         return mod_types + "\n".join(rem_list)
 
-    def visit_TypeDef(self, lhs: ast.expr, rhs: ast.expr) -> str:
+    def visit_ioa_type_def(self, lhs: ast.expr, rhs: ast.expr) -> str:
         assert isinstance(lhs, ast.Name)
         typ_name = self.visit(lhs)
         typ_rhs = self.visit(rhs)
@@ -665,7 +665,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
             return typ_rhs.replace("shorthand'", typ_name)
         return "type " + typ_name + " = " + typ_rhs
 
-    def visit_Shorthand(self, typ: ast.Subscript) -> str:
+    def visit_ioa_shorthand(self, typ: ast.Subscript) -> str:
         assert isinstance(typ.value, ast.Name)
 
         cons = self.visit(typ.value)
@@ -712,7 +712,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
 
         return shorthand + '\n'
 
-    def visit_Composition(self, comp: ast.FunctionDef) -> str:
+    def visit_ioa_composite_automaton(self, comp: ast.FunctionDef) -> str:
         # Set namespace for the given automaton
         self._current_namespace.enter_automaton(comp.name)
 
@@ -721,11 +721,11 @@ class _ToDafnyVisitor(IOAAstVisitor):
         self._current_namespace.exit()
         return result
 
-    def visit_AutomatonWhere(self, cond: ast.expr):
+    def visit_ioa_automaton_where(self, cond: ast.expr):
         return self.__func_name_args(IOA.WHERE) + \
                self.__body_block(self.visit(cond), True)
 
-    def visit_ComponentList(self, comps: ast.ClassDef) -> str:
+    def visit_ioa_component_list(self, comps: ast.ClassDef) -> str:
         # FIXME This assumes self.visit returns a different type than str
         #  This prevents, for example, a pass statement
         comp_list = list(map(self.visit, comps.body))
@@ -807,8 +807,8 @@ class _ToDafnyVisitor(IOAAstVisitor):
         return import_comps + state_typ + initially + \
             inp + outp + internal + compatible + transitions
 
-    def visit_DeclComponent(self, lhs: ast.expr, typ: ast.expr,
-                            rhs: Optional[ast.expr]) -> Tuple[str, str, str]:
+    def visit_ioa_decl_component(self, lhs: ast.expr, typ: ast.expr,
+                                 rhs: Optional[ast.expr]) -> Tuple[str, str, str]:
         if not isinstance(lhs, ast.Name):
             raise NotImplementedError("Declaring a sequence of automata is not supported yet")
         comp_tag = self.visit(lhs)
@@ -819,12 +819,12 @@ class _ToDafnyVisitor(IOAAstVisitor):
         # FIXME If possible, return a string like other functions
         return comp_tag, comp_def, comp_actual
 
-    def visit_AutomatonInstance(self, aut_inst: ast.Call) -> Tuple[str, str]:
+    def visit_ioa_automaton_instance(self, aut_inst: ast.Call) -> Tuple[str, str]:
         assert isinstance(aut_inst.func, ast.Name)
         # FIXME If possible, return a string like other functions
         return self.visit(aut_inst.func), ", ".join(map(self.visit, aut_inst.args))
 
-    def visit_PrimitiveAutomaton(self, prim: ast.FunctionDef) -> str:
+    def visit_ioa_primitive_automaton(self, prim: ast.FunctionDef) -> str:
         # Set namespace for the given automaton
         self._current_namespace.enter_automaton(prim.name)
 
@@ -833,17 +833,17 @@ class _ToDafnyVisitor(IOAAstVisitor):
         self._current_namespace.exit()
         return result
 
-    def visit_FormalParameters(self, para_list: List[ast.arg]) -> str:
+    def visit_ioa_formal_para_list(self, para_list: List[ast.arg]) -> str:
         if para_list:
             return ", ".join(map(self.visit, para_list))
         # else:
         return ""
 
-    def visit_FormalPara(self, para: ast.arg) -> str:
+    def visit_ioa_formal_para(self, para: ast.arg) -> str:
         assert para.annotation
         return para.arg + ": " + self.visit(para.annotation)
 
-    def visit_Signature(self, sig: ast.ClassDef) -> str:
+    def visit_ioa_signature(self, sig: ast.ClassDef) -> str:
         # FIXME This assumes a different return type than str
         act_list = list(map(self.visit, sig.body))
         # Collect actions for creating the global set of actions
@@ -868,7 +868,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
                    self.__body_block(pred_body, True)
         return ret
 
-    def visit_FormalAction(self, act: ast.FunctionDef) \
+    def visit_ioa_formal_action(self, act: ast.FunctionDef) \
             -> Tuple[str, Tuple[str, str, str]]:
         # Set namespace
         self._current_namespace.enter_formal_action(act.name)
@@ -884,21 +884,21 @@ class _ToDafnyVisitor(IOAAstVisitor):
         self._current_namespace.exit()
         return result
 
-    def visit_States(self, states: ast.ClassDef) -> str:
+    def visit_ioa_states(self, states: ast.ClassDef) -> str:
         ret = "datatype State = State("
         ret += ", ".join(map(self.visit, states.body))
         ret += ")"
         return ret
 
-    def visit_DeclStateVar(self, lhs: ast.expr, typ: ast.expr,
-                           rhs: Optional[ast.expr]) -> str:
+    def visit_ioa_decl_state_var(self, lhs: ast.expr, typ: ast.expr,
+                                 rhs: Optional[ast.expr]) -> str:
         assert isinstance(lhs, ast.Name)
         # FIXME This assumes that AST should have been preprocessed so that
         #  initial values are specified only via initially predicate
         assert rhs is None  # TODO error message
         return lhs.id + ": " + self.visit(typ)
 
-    def visit_TransitionList(self, tran_list: ast.ClassDef) -> str:
+    def visit_ioa_transition_list(self, tran_list: ast.ClassDef) -> str:
         # TODO different names to allow multiple (pre, eff) for the same action
         def _gen_name(act):
             suffix = "'" + str(self.__tmp_id_count) + "_" + act
@@ -925,7 +925,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
                         self.__body_block("||\n".join(tran_rel_list)))
         return "\n".join(ret_list)
 
-    def visit_Transition(self, tran: ast.FunctionDef) -> Tuple[str, Tuple[str, str]]:
+    def visit_ioa_transition(self, tran: ast.FunctionDef) -> Tuple[str, Tuple[str, str]]:
         # Set namespace
         self._current_namespace.enter_transition(tran.name)
 
@@ -940,37 +940,37 @@ class _ToDafnyVisitor(IOAAstVisitor):
         self._current_namespace.exit()
         return result
 
-    def visit_ActionType(self, act_typ: IOA) -> str:
+    def visit_ioa_action_type(self, act_typ: IOA) -> str:
         if self._get_scope() == IOA.FORMAL_ACT:
             return str(act_typ)
         if self._get_scope() == IOA.TRANSITION:
             return self.__func_name_args(act_typ, type_hint=False)
 
-    def visit_Precondition(self, cond: ast.expr) -> str:
+    def visit_ioa_precondition(self, cond: ast.expr) -> str:
         return self.visit(cond)
 
-    def visit_Effect(self, stmt_list: List[ast.stmt]) -> str:
+    def visit_ioa_effect(self, stmt_list: List[ast.stmt]) -> str:
         def __enclose(stmt) -> str:
             stmt_str = self.visit(stmt)
             return "var s: State := " + stmt_str + ";"
 
         return "\n".join(map(__enclose, stmt_list)) + " s"
 
-    def visit_Initially(self, cond: ast.expr) -> str:
+    def visit_ioa_initially(self, cond: ast.expr) -> str:
         return self.__func_name_args(IOA.INITIALLY) + \
                self.__body_block(self.visit(cond), True)
 
-    def visit_Invariant(self, cond: ast.expr) -> str:
+    def visit_ioa_invariant(self, cond: ast.expr) -> str:
         inv_pred = self.__func_name_args(IOA.INVARIANT_OF) + \
             self.__body_block(self.visit(cond), True)
         inv_lemma_bmc = self.__lemma_bmc()
         inv_lemma_ind = self.__lemma_induction()
         return inv_pred + inv_lemma_bmc + inv_lemma_ind
 
-    def visit_ActionWhere(self, cond: ast.expr) -> str:
+    def visit_ioa_action_where(self, cond: ast.expr) -> str:
         return self.visit(cond)
 
-    def visit_StmtAssign(self, lhs: ast.expr, rhs: ast.expr) -> str:
+    def visit_ioa_stmt_assign(self, lhs: ast.expr, rhs: ast.expr) -> str:
         assert lhs.ctx and isinstance(lhs.ctx, ast.Store)
         # TODO deal with assignment to sequence elements
         if isinstance(lhs, ast.Name):
@@ -984,18 +984,18 @@ class _ToDafnyVisitor(IOAAstVisitor):
                 self.visit(lhs.slice) + " := " + self.visit(rhs) + "])"
         raise NotImplementedError
 
-    def visit_StmtIf(self, stmt: ast.If) -> str:
+    def visit_ioa_stmt_if(self, stmt: ast.If) -> str:
         return "if " + self.visit(stmt.test) + "\n" + \
                "then " + self.visit(stmt.body) + "\n" + \
                "else " + self.visit(stmt.orelse)
 
-    def visit_StmtPass(self, stmt: ast.Pass) -> str:
+    def visit_ioa_stmt_pass(self, stmt: ast.Pass) -> str:
         if self._get_scope() == IOA.EFF:
             return "s"  # return the same state
         # else:
         return ""
 
-    def visit_Identifier(self, name: ast.Name) -> str:
+    def visit_ioa_identifier(self, name: ast.Name) -> str:
         # FIXME We can also do this case split in IOAAstVisitor, for example,
         #  call visit_LValue() or visit_RValue() based on cases
         # A parameter declaration or L-values in an assignment
@@ -1006,7 +1006,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         # else:  # R-value in assignment or type annotations
         return self._current_namespace.add_namespace(name.id)
 
-    def visit_ExternalCall(self, call: ast.Call) -> str:
+    def visit_ioa_external_call(self, call: ast.Call) -> str:
         assert not call.keywords
         if isinstance(call.func, ast.Name):
             if call.func.id == "len":

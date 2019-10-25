@@ -26,7 +26,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     def visit_Module(self, mod):
         """ Visit parsed AST from ast.parse in 'exec' mode """
         with IOAScopeHandler(self.__scope, IOA.IOA_SPEC):
-            return self.visit_IOASpec(mod)
+            return self.visit_ioa_spec(mod)
 
     def visit_Interactive(self, node):
         """ Visit parsed AST from ast.parse in 'single' mode
@@ -55,15 +55,15 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             if isinstance(node.annotation, ast.Name) and node.annotation.id == str(IOA.TYPE):
                 assert node.value
                 with IOAScopeHandler(self.__scope, IOA.TYPE_DEF):
-                    return self.visit_TypeDef(node.target, node.value)
+                    return self.visit_ioa_type_def(node.target, node.value)
         if self.__scope == IOA.STATES:
             if not isinstance(node.target, ast.Name):
                 raise ValueError("Left-hand side must be an identifier for declaring state variables.")
             with IOAScopeHandler(self.__scope, IOA.DECL_VAR):
-                return self.visit_DeclStateVar(node.target, node.annotation, node.value)
+                return self.visit_ioa_decl_state_var(node.target, node.annotation, node.value)
         if self.__scope == IOA.COMPONENTS:
             with IOAScopeHandler(self.__scope, IOA.DECL_COMPONENT):
-                return self.visit_DeclComponent(node.target, node.annotation, node.value)
+                return self.visit_ioa_decl_component(node.target, node.annotation, node.value)
         # else:
         raise ValueError("Unexpected typed variable\"" + node.target.id +
                          "\" when specifying " + self.__scope.value)
@@ -75,7 +75,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             # TODO allow multiple assignment?
             raise NotImplementedError("Multiple assignment is not supported yet.")
         if self.__scope == IOA.EFF:
-            return self.visit_StmtAssign(node.targets[0], node.value)
+            return self.visit_ioa_stmt_assign(node.targets[0], node.value)
 
         if not isinstance(node.targets[0], ast.Name):
             raise NotImplementedError(
@@ -84,24 +84,24 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         if self.__scope == IOA.AUTOMATON:
             if lhs_str == str(IOA.INITIALLY):
                 with IOAScopeHandler(self.__scope, IOA.INITIALLY):
-                    return self.visit_Initially(node.value)
+                    return self.visit_ioa_initially(node.value)
             if lhs_str == str(IOA.INVARIANT_OF):
                 with IOAScopeHandler(self.__scope, IOA.INVARIANT_OF):
-                    return self.visit_Invariant(node.value)
+                    return self.visit_ioa_invariant(node.value)
             if lhs_str == str(IOA.WHERE):
                 with IOAScopeHandler(self.__scope, IOA.WHERE):
-                    return self.visit_AutomatonWhere(node.value)
+                    return self.visit_ioa_automaton_where(node.value)
         if self.__scope == IOA.COMPOSITION:
             if lhs_str == str(IOA.INVARIANT_OF):
                 with IOAScopeHandler(self.__scope, IOA.INVARIANT_OF):
-                    return self.visit_Invariant(node.value)
+                    return self.visit_ioa_invariant(node.value)
             if lhs_str == str(IOA.WHERE):
                 with IOAScopeHandler(self.__scope, IOA.WHERE):
-                    return self.visit_AutomatonWhere(node.value)
+                    return self.visit_ioa_automaton_where(node.value)
         if self.__scope == IOA.FORMAL_ACT:
             if lhs_str == str(IOA.WHERE):
                 with IOAScopeHandler(self.__scope, IOA.WHERE):
-                    return self.visit_ActionWhere(node.value)
+                    return self.visit_ioa_action_where(node.value)
         # else:
         if self.__scope == IOA.STATES:
             raise ValueError("Type of \"" + lhs_str +
@@ -114,16 +114,16 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             if isinstance(call.func, ast.Name) and call.func.id == str(IOA.PRE):
                 assert call.args and len(call.args) == 1
                 with IOAScopeHandler(self.__scope, IOA.PRE):
-                    return self.visit_Precondition(call.args[0])
+                    return self.visit_ioa_precondition(call.args[0])
         if self.__scope == IOA.DECL_COMPONENT:
             with IOAScopeHandler(self.__scope, IOA.AUTOMATON_INSTANCE):
-                return self.visit_AutomatonInstance(call)
+                return self.visit_ioa_automaton_instance(call)
         if self.__scope == IOA.EFF or \
                 self.__scope == IOA.PRE or \
                 self.__scope == IOA.INITIALLY or \
                 self.__scope == IOA.INVARIANT_OF or \
                 self.__scope == IOA.WHERE:
-            return self.visit_ExternalCall(call)
+            return self.visit_ioa_external_call(call)
         # else:
         if isinstance(call.func, ast.Name):
             func = call.func.id
@@ -136,29 +136,29 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         if self.__scope == IOA.AUTOMATON:
             if class_def.name == str(IOA.SIGNATURE):
                 with IOAScopeHandler(self.__scope, IOA.SIGNATURE):
-                    return self.visit_Signature(class_def)
+                    return self.visit_ioa_signature(class_def)
             if class_def.name == str(IOA.STATES):
                 with IOAScopeHandler(self.__scope, IOA.STATES):
-                    return self.visit_States(class_def)
+                    return self.visit_ioa_states(class_def)
             if class_def.name == str(IOA.TRANSITIONS):
                 with IOAScopeHandler(self.__scope, IOA.TRANSITIONS):
-                    return self.visit_TransitionList(class_def)
+                    return self.visit_ioa_transition_list(class_def)
             if class_def.name == str(IOA.TRAJECTORIES):
                 with IOAScopeHandler(self.__scope, IOA.TRAJECTORIES):
-                    return self.visit_Trajectories(class_def)
+                    return self.visit_ioa_trajectories(class_def)
         if self.__scope == IOA.COMPOSITION:
             if class_def.name == str(IOA.COMPONENTS):
                 with IOAScopeHandler(self.__scope, IOA.COMPONENTS):
-                    return self.visit_ComponentList(class_def)
+                    return self.visit_ioa_component_list(class_def)
             if class_def.name == str(IOA.HIDDEN):
                 with IOAScopeHandler(self.__scope, IOA.HIDDEN):
-                    return self.visit_Hidden(class_def)
+                    return self.visit_ioa_hidden(class_def)
         # else:
         raise ValueError("Unexpected class \"" + class_def.name +
                          "\" when specifying " + self.__scope.value)
 
     def visit_For(self, stmt):
-        return self.visit_StmtFor(stmt)
+        return self.visit_ioa_stmt_for(stmt)
 
     def visit_FunctionDef(self, func_def):
         if not func_def.decorator_list:
@@ -174,39 +174,39 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             deco = func_def.decorator_list[0].id
             if deco == str(IOA.COMPOSITION):
                 with IOAScopeHandler(self.__scope, IOA.COMPOSITION):
-                    return self.visit_Composition(func_def)
+                    return self.visit_ioa_composite_automaton(func_def)
             if deco == str(IOA.AUTOMATON):
                 with IOAScopeHandler(self.__scope, IOA.AUTOMATON):
-                    return self.visit_PrimitiveAutomaton(func_def)
+                    return self.visit_ioa_primitive_automaton(func_def)
             if deco == str(IOA.SIMULATION):
                 with IOAScopeHandler(self.__scope, IOA.SIMULATION):
-                    return self.visit_Simulation(func_def)
+                    return self.visit_ioa_simulation(func_def)
             # else:
             raise ValueError("Unexpected decorator \"" + deco +
                              "\" for \"" + func_def.name + "\"")
         if self.__scope == IOA.SIGNATURE:
             with IOAScopeHandler(self.__scope, IOA.FORMAL_ACT):
-                return self.visit_FormalAction(func_def)
+                return self.visit_ioa_formal_action(func_def)
         if self.__scope == IOA.TRANSITIONS:
             with IOAScopeHandler(self.__scope, IOA.TRANSITION):
-                return self.visit_Transition(func_def)
+                return self.visit_ioa_transition(func_def)
         # else:
         raise ValueError("Unexpected function \"" + func_def.name +
                          "\" when specifying " + self.__scope.value)
 
     def visit_If(self, stmt):
-        return self.visit_StmtIf(stmt)
+        return self.visit_ioa_stmt_if(stmt)
 
     def visit_Name(self, name):
         construct = IOA.get(name.id, None)
         # Check if name is a not reserved word
         if not construct:
-            return self.visit_Identifier(name)
+            return self.visit_ioa_identifier(name)
         # name.id is a reserved word
         if self.__scope == IOA.FORMAL_ACT or \
                 self.__scope == IOA.TRANSITION:
             if construct in [IOA.INPUT, IOA.INTERNAL, IOA.OUTPUT]:
-                return self.visit_ActionType(construct)
+                return self.visit_ioa_action_type(construct)
             raise ValueError("Unexpected action type \"" + name.id + "\"")
         # else:
         raise ValueError("Reserved word \"" + name.id + "\" is used as an identifier")
@@ -216,12 +216,12 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         return self.visit(stmt.value)
 
     def visit_Pass(self, stmt):
-        return self.visit_StmtPass(stmt)
+        return self.visit_ioa_stmt_pass(stmt)
 
     def visit_Subscript(self, exp):
         if self.__scope == IOA.TYPE_DEF:
             with IOAScopeHandler(self.__scope, IOA.SHORTHAND):
-                return self.visit_Shorthand(exp)
+                return self.visit_ioa_shorthand(exp)
         if self.__scope in \
                 [IOA.TYPE_DEF, IOA.FORMAL_PARA, IOA.DECL_VAR]:
             assert not isinstance(exp.ctx, ast.Store) \
@@ -247,15 +247,15 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             raise ValueError("Unexpected formal parameter specification for "
                              + str(self.__scope))
         with IOAScopeHandler(self.__scope, IOA.FORMAL_PARA_LIST):
-            return self.visit_FormalParameters(arguments.args)
+            return self.visit_ioa_formal_para_list(arguments.args)
 
     def visit_arg(self, arg):
         if self.__scope == IOA.FORMAL_PARA_LIST:
             with IOAScopeHandler(self.__scope, IOA.FORMAL_PARA):
-                return self.visit_FormalPara(arg)
+                return self.visit_ioa_formal_para(arg)
         if self.__scope == IOA.ACTUAL_PARA_LIST:
             with IOAScopeHandler(self.__scope, IOA.ACTUAL_PARA):
-                return self.visit_ActualPara(arg)
+                return self.visit_ioa_actual_para(arg)
         raise AssertionError("Should be unreachable")  # FIXME error message
 
     def visit_list(self, ls):
@@ -267,7 +267,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
                 self.__scope == IOA.EFF:
             assert all(isinstance(s, ast.stmt) for s in ls)
             with IOAScopeHandler(self.__scope, IOA.EFF):
-                return self.visit_Effect(ls)
+                return self.visit_ioa_effect(ls)
         # else:
         raise ValueError("Unexpected list " + str(ls) +
                          " when specifying " + self.__scope.value)
@@ -275,111 +275,111 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     # endregion
 
     # region IOA specific language constructs
-    def visit_IOASpec(self, spec: ast.Module):
+    def visit_ioa_spec(self, spec: ast.Module):
         pass
 
-    def visit_PrimitiveAutomaton(self, prim: ast.FunctionDef):
+    def visit_ioa_primitive_automaton(self, prim: ast.FunctionDef):
         pass
 
-    def visit_AutomatonInstance(self, aut_inst: ast.Call):
+    def visit_ioa_automaton_instance(self, aut_inst: ast.Call):
         pass
 
-    def visit_Composition(self, comp: ast.FunctionDef):
+    def visit_ioa_composite_automaton(self, comp: ast.FunctionDef):
         pass
 
-    def visit_ComponentList(self, comps: ast.ClassDef):
+    def visit_ioa_component_list(self, comps: ast.ClassDef):
         pass
 
-    def visit_DeclStateVar(self, lhs: ast.expr, typ: ast.expr,
-                           rhs: Optional[ast.expr]):
+    def visit_ioa_decl_state_var(self, lhs: ast.expr, typ: ast.expr,
+                                 rhs: Optional[ast.expr]):
         pass
 
-    def visit_DeclComponent(self, lhs: ast.expr, typ: ast.expr,
-                            rhs: Optional[ast.expr]):
+    def visit_ioa_decl_component(self, lhs: ast.expr, typ: ast.expr,
+                                 rhs: Optional[ast.expr]):
         pass
 
-    def visit_Effect(self, stmt_list: List[ast.stmt]):
+    def visit_ioa_effect(self, stmt_list: List[ast.stmt]):
         pass
 
-    def visit_ActionType(self, act_typ: str):
+    def visit_ioa_action_type(self, act_typ: str):
         pass
 
-    def visit_FormalAction(self, act: ast.FunctionDef):
+    def visit_ioa_formal_action(self, act: ast.FunctionDef):
         pass
 
-    def visit_FormalParameters(self, para_list: List[ast.arg]):
+    def visit_ioa_formal_para_list(self, para_list: List[ast.arg]):
         pass
 
-    def visit_FormalPara(self, para: ast.arg):
+    def visit_ioa_formal_para(self, para: ast.arg):
         pass
 
-    def visit_ActualParameters(self, para_list):
+    def visit_ioa_actual_para_list(self, para_list):
         pass
 
-    def visit_ActualPara(self, para):
+    def visit_ioa_actual_para(self, para):
         pass
 
-    def visit_Hidden(self, node):
+    def visit_ioa_hidden(self, node):
         raise NotImplementedError("Hidden actions are not supported yet")
 
-    def visit_Identifier(self, name: ast.Name):
+    def visit_ioa_identifier(self, name: ast.Name):
         pass
 
-    def visit_Signature(self, sig: ast.ClassDef):
+    def visit_ioa_signature(self, sig: ast.ClassDef):
         pass
 
-    def visit_Simulation(self, node):
+    def visit_ioa_simulation(self, node):
         raise NotImplementedError("Simulations are not supported yet.")
 
-    def visit_States(self, states: ast.ClassDef):
+    def visit_ioa_states(self, states: ast.ClassDef):
         pass
 
-    def visit_Trajectories(self, node):
+    def visit_ioa_trajectories(self, node):
         raise NotImplementedError("Trajectories are not supported yet.")
 
-    def visit_TransitionList(self, tran_list: ast.ClassDef):
+    def visit_ioa_transition_list(self, tran_list: ast.ClassDef):
         pass
 
-    def visit_Transition(self, tran: ast.FunctionDef):
+    def visit_ioa_transition(self, tran: ast.FunctionDef):
         pass
 
-    def visit_TypeDef(self, lhs: ast.expr, rhs: ast.expr):
+    def visit_ioa_type_def(self, lhs: ast.expr, rhs: ast.expr):
         pass
 
-    def visit_Initially(self, cond: ast.expr):
+    def visit_ioa_initially(self, cond: ast.expr):
         pass
 
-    def visit_Invariant(self, cond: ast.expr):
+    def visit_ioa_invariant(self, cond: ast.expr):
         pass
 
-    def visit_Precondition(self, cond: ast.expr):
+    def visit_ioa_precondition(self, cond: ast.expr):
         pass
 
-    def visit_AutomatonWhere(self, cond: ast.expr):
+    def visit_ioa_automaton_where(self, cond: ast.expr):
         pass
 
-    def visit_ActionWhere(self, cond: ast.expr):
+    def visit_ioa_action_where(self, cond: ast.expr):
         pass
 
-    def visit_StmtAssign(self, lhs: ast.expr, rhs: ast.expr):
+    def visit_ioa_stmt_assign(self, lhs: ast.expr, rhs: ast.expr):
         pass
 
-    def visit_StmtFor(self, stmt: ast.For):
+    def visit_ioa_stmt_for(self, stmt: ast.For):
         raise NotImplementedError("For-loops are not supported now.")
 
-    def visit_StmtIf(self, stmt: ast.If):
+    def visit_ioa_stmt_if(self, stmt: ast.If):
         pass
 
-    def visit_StmtPass(self, stmt: ast.Pass):
+    def visit_ioa_stmt_pass(self, stmt: ast.Pass):
         pass
 
-    def visit_Shorthand(self, typ: ast.Call):
+    def visit_ioa_shorthand(self, typ: ast.Call):
         """ Shorthand is to build new types via enumeration, tuple, or union.
             See IOA manual Section 23
         """
         pass
 
-    def visit_ExternalCall(self, call: ast.Call):
+    def visit_ioa_external_call(self, call: ast.Call):
         pass
 
     # endregion

@@ -39,7 +39,7 @@ class IOAAstChecker(IOAAstVisitor):
         # TODO check if the body contains exactly one from constructs in one_of
 
     # IOA specific language constructs
-    def visit_IOASpec(self, spec):
+    def visit_ioa_spec(self, spec):
         assert isinstance(spec, ast.Module)
 
         ioa_iter = map(self.visit, spec.body)
@@ -48,7 +48,7 @@ class IOAAstChecker(IOAAstVisitor):
                                     IOA.SIMULATION, IOA.TYPE_DEF])
         return IOA.IOA_SPEC
 
-    def visit_PrimitiveAutomaton(self, prim):
+    def visit_ioa_primitive_automaton(self, prim):
         assert isinstance(prim, ast.FunctionDef)
 
         parameters = self.visit(prim.args)
@@ -61,13 +61,13 @@ class IOAAstChecker(IOAAstVisitor):
                           optional=[IOA.INVARIANT_OF])
         return IOA.AUTOMATON
 
-    def visit_AutomatonInstance(self, aut_inst):
+    def visit_ioa_automaton_instance(self, aut_inst):
         assert isinstance(aut_inst, ast.Call)
         # TODO Check if the number of arguments matches the automaton definition
         # TODO Check if the actual parameters use only parameters or global identifiers
         return IOA.AUTOMATON_INSTANCE
 
-    def visit_Composition(self, comp):
+    def visit_ioa_composite_automaton(self, comp):
         assert isinstance(comp, ast.FunctionDef)
 
         parameters = self.visit(comp.args)
@@ -79,7 +79,7 @@ class IOAAstChecker(IOAAstVisitor):
                           optional=[IOA.INVARIANT_OF])
         return IOA.COMPOSITION
 
-    def visit_ComponentList(self, comps):
+    def visit_ioa_component_list(self, comps):
         assert isinstance(comps, ast.ClassDef)
 
         ioa_iter = map(self.visit, comps.body)
@@ -88,7 +88,7 @@ class IOAAstChecker(IOAAstVisitor):
                           leq_one=[IOA.HIDDEN])
         return IOA.COMPONENTS
 
-    def visit_DeclComponent(self, lhs, typ, rhs):
+    def visit_ioa_decl_component(self, lhs, typ, rhs):
         if not isinstance(lhs, ast.Name):
             raise NotImplementedError("Declaring a sequence of automata is not supported yet")
         assert isinstance(typ, ast.expr)
@@ -100,7 +100,7 @@ class IOAAstChecker(IOAAstVisitor):
                              "\" when specifying " + self._get_scope().value)
         return IOA.DECL_COMPONENT
 
-    def visit_DeclStateVar(self, lhs, typ, rhs):
+    def visit_ioa_decl_state_var(self, lhs, typ, rhs):
         assert isinstance(lhs, ast.Name)
         assert isinstance(typ, ast.expr)
         assert rhs is None or isinstance(rhs, ast.expr)
@@ -110,14 +110,14 @@ class IOAAstChecker(IOAAstVisitor):
             self.visit(rhs)
         return IOA.DECL_VAR
 
-    def visit_Effect(self, stmt_list):
+    def visit_ioa_effect(self, stmt_list):
         ioa_iter = map(self.visit, stmt_list)
         self.__check_list(ioa_iter,
                           optional=[IOA.ASSIGN, IOA.IF,
                                     IOA.FOR, IOA.PASS])
         return IOA.EFF
 
-    def visit_FormalAction(self, act):
+    def visit_ioa_formal_action(self, act):
         assert isinstance(act, ast.FunctionDef)
 
         parameters = self.visit(act.args)
@@ -128,7 +128,7 @@ class IOAAstChecker(IOAAstVisitor):
                           optional=[IOA.PASS])
         return IOA.FORMAL_ACT
 
-    def visit_FormalParameters(self, para_list):
+    def visit_ioa_formal_para_list(self, para_list):
         assert isinstance(para_list, list)
         assert all(isinstance(p, ast.arg) for p in para_list)
 
@@ -137,12 +137,12 @@ class IOAAstChecker(IOAAstVisitor):
                           optional=[IOA.FORMAL_PARA])
         return IOA.FORMAL_PARA_LIST
 
-    def visit_FormalPara(self, para):
+    def visit_ioa_formal_para(self, para):
         assert isinstance(para, ast.arg)
         # TODO Check parameters are typed
         return IOA.FORMAL_PARA
 
-    def visit_ActualParameters(self, para_list):
+    def visit_ioa_actual_para_list(self, para_list):
         assert isinstance(para_list, list)
         assert all(isinstance(p, ast.arg) for p in para_list)
 
@@ -151,27 +151,27 @@ class IOAAstChecker(IOAAstVisitor):
                           optional=[IOA.ACTUAL_PARA])
         return IOA.ACTUAL_PARA_LIST
 
-    def visit_ActualPara(self, para):
+    def visit_ioa_actual_para(self, para):
         assert isinstance(para, ast.arg)
         # TODO
         return IOA.ACTUAL_PARA
 
-    def visit_Initially(self, cond):
+    def visit_ioa_initially(self, cond):
         assert isinstance(cond, ast.expr)
         # TODO Check initial condition is bool
         return IOA.INITIALLY
 
-    def visit_Invariant(self, cond):
+    def visit_ioa_invariant(self, cond):
         assert isinstance(cond, ast.expr)
         # TODO Check invariant is bool
         return IOA.INVARIANT_OF
 
-    def visit_Precondition(self, cond):
+    def visit_ioa_precondition(self, cond):
         assert isinstance(cond, ast.expr)
         # TODO Check precondition is bool
         return IOA.PRE
 
-    def visit_Signature(self, sig):
+    def visit_ioa_signature(self, sig):
         assert isinstance(sig, ast.ClassDef)
 
         ioa_iter = map(self.visit, sig.body)
@@ -179,12 +179,12 @@ class IOAAstChecker(IOAAstVisitor):
                           geq_one=[IOA.FORMAL_ACT])
         return IOA.SIGNATURE
 
-    def visit_States(self, states):
+    def visit_ioa_states(self, states):
         assert isinstance(states, ast.ClassDef)
         # TODO
         return IOA.STATES
 
-    def visit_TransitionList(self, tran_list):
+    def visit_ioa_transition_list(self, tran_list):
         assert isinstance(tran_list, ast.ClassDef)
 
         ioa_iter = map(self.visit, tran_list.body)
@@ -192,7 +192,7 @@ class IOAAstChecker(IOAAstVisitor):
                           geq_one=[IOA.TRANSITION])
         return IOA.TRANSITIONS
 
-    def visit_Transition(self, tran):
+    def visit_ioa_transition(self, tran):
         assert isinstance(tran, ast.FunctionDef)
         ioa_iter = map(self.visit, tran.decorator_list)
         self.__check_list(ioa_iter,
@@ -206,33 +206,33 @@ class IOAAstChecker(IOAAstVisitor):
                              "\" when specifying " + self._get_scope().value)
         return IOA.TRANSITION
 
-    def visit_ActionType(self, act_typ):
+    def visit_ioa_action_type(self, act_typ):
         assert isinstance(act_typ, IOA)
         assert act_typ in [IOA.INPUT, IOA.INTERNAL, IOA.OUTPUT]
         return act_typ
 
-    def visit_TypeDef(self, lhs, rhs):
+    def visit_ioa_type_def(self, lhs, rhs):
         assert isinstance(lhs, ast.Name)
         assert isinstance(rhs, ast.expr)
         # TODO Collect Type Information from rhs
         self.visit(rhs)
         return IOA.TYPE_DEF
 
-    def visit_AutomatonWhere(self, cond: ast.expr):
+    def visit_ioa_automaton_where(self, cond: ast.expr):
         assert isinstance(cond, ast.expr)
 
         # TODO Check where clause is bool
         self.visit(cond)
         return IOA.WHERE
 
-    def visit_ActionWhere(self, cond: ast.expr):
+    def visit_ioa_action_where(self, cond: ast.expr):
         assert isinstance(cond, ast.expr)
 
         # TODO Check where clause is bool
         self.visit(cond)
         return IOA.WHERE
 
-    def visit_StmtAssign(self, lhs, rhs):
+    def visit_ioa_stmt_assign(self, lhs, rhs):
         assert isinstance(lhs, ast.Name)
         assert isinstance(rhs, ast.expr)
 
@@ -240,18 +240,18 @@ class IOAAstChecker(IOAAstVisitor):
         self.visit(rhs)
         return IOA.ASSIGN
 
-    def visit_StmtIf(self, stmt):
+    def visit_ioa_stmt_if(self, stmt):
         # TODO
         return IOA.IF
 
-    def visit_StmtPass(self, stmt):
+    def visit_ioa_stmt_pass(self, stmt):
         # TODO Do we have to differentiate pass statements appearing under different constructs
         return IOA.PASS
 
-    def visit_Identifier(self, name: ast.Name):
+    def visit_ioa_identifier(self, name: ast.Name):
         # TODO
         return IOA.IDENTIFIER
 
-    def visit_Shorthand(self, typ):
+    def visit_ioa_shorthand(self, typ):
         # TODO
         return IOA.SHORTHAND
