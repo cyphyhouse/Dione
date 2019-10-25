@@ -45,6 +45,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     # endregion
 
     # region Python language constructs
+    # region Python statements
     def visit_AnnAssign(self, node):
         """ Variable annotated with type hints and followed by an optional assigned value. """
         if not isinstance(node.target, ast.Name):
@@ -197,6 +198,15 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
     def visit_If(self, stmt):
         return self.visit_ioa_stmt_if(stmt)
 
+    def visit_Expr(self, stmt):
+        """ Expression as a statement"""
+        return self.visit(stmt.value)
+
+    def visit_Pass(self, stmt):
+        return self.visit_ioa_stmt_pass(stmt)
+    # endregion
+
+    # region Python expressions
     def visit_Name(self, name):
         construct = IOA.get(name.id, None)
         # Check if name is a not reserved word
@@ -210,13 +220,6 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
             raise ValueError("Unexpected action type \"" + name.id + "\"")
         # else:
         raise ValueError("Reserved word \"" + name.id + "\" is used as an identifier")
-
-    def visit_Expr(self, stmt):
-        """ Expression as a statement"""
-        return self.visit(stmt.value)
-
-    def visit_Pass(self, stmt):
-        return self.visit_ioa_stmt_pass(stmt)
 
     def visit_Subscript(self, exp):
         if self.__scope == IOA.TYPE_DEF:
@@ -271,7 +274,7 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         # else:
         raise ValueError("Unexpected list " + str(ls) +
                          " when specifying " + self.__scope.value)
-
+    # endregion
     # endregion
 
     # region IOA specific language constructs
