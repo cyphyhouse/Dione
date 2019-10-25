@@ -332,7 +332,6 @@ class _ToDafnyVisitor(IOAAstVisitor):
         )
         return "\n".join(ret_list) + self.__body_block("", True)
 
-
     # region Python expression visitors
     def visit_BoolOp(self, exp) -> str:
         op_str = self.visit(exp.op)
@@ -843,6 +842,12 @@ class _ToDafnyVisitor(IOAAstVisitor):
         assert para.annotation
         return para.arg + ": " + self.visit(para.annotation)
 
+    def visit_ioa_actual_para_list(self, para_list):
+        pass
+
+    def visit_ioa_actual_para(self, para):
+        pass
+
     def visit_ioa_signature(self, sig: ast.ClassDef) -> str:
         # FIXME This assumes a different return type than str
         act_list = list(map(self.visit, sig.body))
@@ -1045,5 +1050,17 @@ class _ToDafnyVisitor(IOAAstVisitor):
         # Reset namespace
         self._current_namespace.exit()
         return result
+
+    def visit_ioa_hidden(self, node):
+        raise NotImplementedError("Hidden actions are not supported yet")
+
+    def visit_ioa_simulation(self, node):
+        raise NotImplementedError("Simulations are not supported yet.")
+
+    def visit_ioa_trajectories(self, node):
+        raise NotImplementedError("Trajectories are not supported yet.")
+
+    def visit_ioa_stmt_for(self, stmt: ast.For):
+        raise NotImplementedError("For-loops are not supported yet.")
 
     # endregion

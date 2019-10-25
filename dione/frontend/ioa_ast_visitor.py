@@ -4,9 +4,9 @@
 
 import abc
 import ast
-from typing import List, Optional
 
 from dione.frontend.ioa_constructs import IOA, IOAScope, IOAScopeHandler
+from dione.frontend.ioa_ast_visitor_interface import IOAAstVisitorInterface
 
 
 # TODO Decide in each visit function whether we give user AST root node itself
@@ -14,12 +14,13 @@ from dione.frontend.ioa_constructs import IOA, IOAScope, IOAScopeHandler
 #  For example, visit_Signature only need the body and doesn't need
 #  decorator_list and others
 
-class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
+class IOAAstVisitor(IOAAstVisitorInterface, ast.NodeVisitor, abc.ABC):
     def __init__(self):
         self.__scope = IOAScope()
 
     # Util functions
     def _get_scope(self):
+        """ Getter function of the current scope for derived classes """
         return self.__scope
 
     # region Top level Python AST node types
@@ -275,114 +276,4 @@ class IOAAstVisitor(abc.ABC, ast.NodeVisitor):
         raise ValueError("Unexpected list " + str(ls) +
                          " when specifying " + self.__scope.value)
     # endregion
-    # endregion
-
-    # region IOA specific language constructs
-    def visit_ioa_spec(self, spec: ast.Module):
-        pass
-
-    def visit_ioa_primitive_automaton(self, prim: ast.FunctionDef):
-        pass
-
-    def visit_ioa_automaton_instance(self, aut_inst: ast.Call):
-        pass
-
-    def visit_ioa_composite_automaton(self, comp: ast.FunctionDef):
-        pass
-
-    def visit_ioa_component_list(self, comps: ast.ClassDef):
-        pass
-
-    def visit_ioa_decl_state_var(self, lhs: ast.expr, typ: ast.expr,
-                                 rhs: Optional[ast.expr]):
-        pass
-
-    def visit_ioa_decl_component(self, lhs: ast.expr, typ: ast.expr,
-                                 rhs: Optional[ast.expr]):
-        pass
-
-    def visit_ioa_effect(self, stmt_list: List[ast.stmt]):
-        pass
-
-    def visit_ioa_action_type(self, act_typ: str):
-        pass
-
-    def visit_ioa_formal_action(self, act: ast.FunctionDef):
-        pass
-
-    def visit_ioa_formal_para_list(self, para_list: List[ast.arg]):
-        pass
-
-    def visit_ioa_formal_para(self, para: ast.arg):
-        pass
-
-    def visit_ioa_actual_para_list(self, para_list):
-        pass
-
-    def visit_ioa_actual_para(self, para):
-        pass
-
-    def visit_ioa_hidden(self, node):
-        raise NotImplementedError("Hidden actions are not supported yet")
-
-    def visit_ioa_identifier(self, name: ast.Name):
-        pass
-
-    def visit_ioa_signature(self, sig: ast.ClassDef):
-        pass
-
-    def visit_ioa_simulation(self, node):
-        raise NotImplementedError("Simulations are not supported yet.")
-
-    def visit_ioa_states(self, states: ast.ClassDef):
-        pass
-
-    def visit_ioa_trajectories(self, node):
-        raise NotImplementedError("Trajectories are not supported yet.")
-
-    def visit_ioa_transition_list(self, tran_list: ast.ClassDef):
-        pass
-
-    def visit_ioa_transition(self, tran: ast.FunctionDef):
-        pass
-
-    def visit_ioa_type_def(self, lhs: ast.expr, rhs: ast.expr):
-        pass
-
-    def visit_ioa_initially(self, cond: ast.expr):
-        pass
-
-    def visit_ioa_invariant(self, cond: ast.expr):
-        pass
-
-    def visit_ioa_precondition(self, cond: ast.expr):
-        pass
-
-    def visit_ioa_automaton_where(self, cond: ast.expr):
-        pass
-
-    def visit_ioa_action_where(self, cond: ast.expr):
-        pass
-
-    def visit_ioa_stmt_assign(self, lhs: ast.expr, rhs: ast.expr):
-        pass
-
-    def visit_ioa_stmt_for(self, stmt: ast.For):
-        raise NotImplementedError("For-loops are not supported now.")
-
-    def visit_ioa_stmt_if(self, stmt: ast.If):
-        pass
-
-    def visit_ioa_stmt_pass(self, stmt: ast.Pass):
-        pass
-
-    def visit_ioa_shorthand(self, typ: ast.Call):
-        """ Shorthand is to build new types via enumeration, tuple, or union.
-            See IOA manual Section 23
-        """
-        pass
-
-    def visit_ioa_external_call(self, call: ast.Call):
-        pass
-
     # endregion

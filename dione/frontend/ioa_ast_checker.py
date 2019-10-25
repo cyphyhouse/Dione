@@ -255,3 +255,18 @@ class IOAAstChecker(IOAAstVisitor):
     def visit_ioa_shorthand(self, typ):
         # TODO
         return IOA.SHORTHAND
+
+    def visit_ioa_hidden(self, node):
+        raise NotImplementedError("Hidden actions are not supported yet")
+
+    def visit_ioa_simulation(self, node):
+        raise NotImplementedError("Simulations are not supported yet.")
+
+    def visit_ioa_trajectories(self, node):
+        raise NotImplementedError("Trajectories are not supported yet.")
+
+    def visit_ioa_stmt_for(self, stmt: ast.For):
+        raise NotImplementedError("For-loops are not supported yet.")
+
+    def visit_ioa_external_call(self, call: ast.Call):
+        raise NotImplementedError("External function calls are not supported yet.")
