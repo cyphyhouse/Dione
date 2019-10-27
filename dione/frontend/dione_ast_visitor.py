@@ -14,7 +14,7 @@ from dione.frontend.ioa_ast_visitor_interface import IOAAstVisitorInterface
 #  For example, visit_Signature only need the body and doesn't need
 #  decorator_list and others
 
-class IOAAstVisitor(IOAAstVisitorInterface, ast.NodeVisitor, abc.ABC):
+class DioneAstVisitor(IOAAstVisitorInterface, ast.NodeVisitor, abc.ABC):
     def __init__(self):
         self._scope = IOAScope()
 

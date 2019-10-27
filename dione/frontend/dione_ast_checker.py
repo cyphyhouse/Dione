@@ -5,10 +5,10 @@
 import ast
 
 from dione.frontend.ioa_constructs import IOA
-from dione.frontend.ioa_ast_visitor import IOAAstVisitor
+from dione.frontend.dione_ast_visitor import DioneAstVisitor
 
 
-class IOAAstChecker(IOAAstVisitor):
+class DioneAstChecker(DioneAstVisitor):
     def __init__(self):
         super().__init__()
 

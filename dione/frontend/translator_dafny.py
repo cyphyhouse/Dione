@@ -5,7 +5,7 @@ import io
 import symtable
 from typing import List, Optional, Tuple
 
-from dione.frontend.ioa_ast_visitor import IOAAstVisitor
+from dione.frontend.dione_ast_visitor import DioneAstVisitor
 from dione.frontend.ioa_constructs import IOA
 
 
@@ -167,7 +167,7 @@ class _IOANamespace:
         raise RuntimeError("Unexpected identifier \"" + identifier + "\"")
 
 
-class _ToDafnyVisitor(IOAAstVisitor):
+class _ToDafnyVisitor(DioneAstVisitor):
     def __init__(self, ns: _IOANamespace, k: int):
         assert 0 <= k
         super().__init__()
