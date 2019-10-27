@@ -29,10 +29,10 @@ class IOAAstChecker(IOAAstVisitor):
         for ioa_construct in ioa_iter:
             if not isinstance(ioa_construct, IOA):
                 raise ValueError("Unexpected return value \"" + str(ioa_construct) +
-                                 "\" when specifying " + self._get_scope().value)
+                                 "\" when specifying " + self._scope.value)
             if ioa_construct not in (eq_one + geq_one + leq_one + one_of + optional):
                 raise ValueError("Unexpected \"" + str(ioa_construct) +
-                                 "\" when specifying " + self._get_scope().value)
+                                 "\" when specifying " + self._scope.value)
         # TODO check if the body contains exactly one of each construct in eq_one
         # TODO check if the body contains at least one of each construct in geq_one
         # TODO check if the body contains at most one of each construct in leq_one
@@ -97,7 +97,7 @@ class IOAAstChecker(IOAAstVisitor):
         ioa_construct = self.visit(typ)
         if ioa_construct != IOA.AUTOMATON_INSTANCE:
             raise ValueError("Unexpected \"" + str(ioa_construct) +
-                             "\" when specifying " + self._get_scope().value)
+                             "\" when specifying " + self._scope.value)
         return IOA.DECL_COMPONENT
 
     def visit_ioa_decl_state_var(self, lhs, typ, rhs):
@@ -203,7 +203,7 @@ class IOAAstChecker(IOAAstVisitor):
         effect = self.visit(tran.body)
         if effect != IOA.EFF:
             raise ValueError("Unexpected \"" + str(effect) +
-                             "\" when specifying " + self._get_scope().value)
+                             "\" when specifying " + self._scope.value)
         return IOA.TRANSITION
 
     def visit_ioa_action_type(self, act_typ):

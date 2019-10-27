@@ -445,7 +445,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
         return str(exp.n)
 
     def visit_Str(self, exp) -> str:
-        if self._get_scope() == IOA.IOA_SPEC:
+        if self._scope == IOA.IOA_SPEC:
             return "/*" + exp.s + "*/"
         raise NotImplementedError
 
@@ -946,9 +946,9 @@ class _ToDafnyVisitor(IOAAstVisitor):
         return result
 
     def visit_ioa_action_type(self, act_typ: IOA) -> str:
-        if self._get_scope() == IOA.FORMAL_ACT:
+        if self._scope == IOA.FORMAL_ACT:
             return str(act_typ)
-        if self._get_scope() == IOA.TRANSITION:
+        if self._scope == IOA.TRANSITION:
             return self.__func_name_args(act_typ, type_hint=False)
 
     def visit_ioa_precondition(self, cond: ast.expr) -> str:
@@ -995,7 +995,7 @@ class _ToDafnyVisitor(IOAAstVisitor):
                "else " + self.visit(stmt.orelse)
 
     def visit_ioa_stmt_pass(self, stmt: ast.Pass) -> str:
-        if self._get_scope() == IOA.EFF:
+        if self._scope == IOA.EFF:
             return "s"  # return the same state
         # else:
         return ""
