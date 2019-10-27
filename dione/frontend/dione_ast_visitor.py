@@ -5,8 +5,8 @@
 import abc
 import ast
 
-from dione.frontend.ioa_constructs import IOA, IOAScope, IOAScopeHandler
-from dione.frontend.ioa_ast_visitor_interface import IOAAstVisitorInterface
+from dione.frontend.dio_ast_visitor import DioAstVisitor
+from dione.frontend.ioa_constructs import IOA, IOAScopeHandler
 
 
 # TODO Decide in each visit function whether we give user AST root node itself
@@ -14,32 +14,7 @@ from dione.frontend.ioa_ast_visitor_interface import IOAAstVisitorInterface
 #  For example, visit_Signature only need the body and doesn't need
 #  decorator_list and others
 
-class DioneAstVisitor(IOAAstVisitorInterface, ast.NodeVisitor, abc.ABC):
-    def __init__(self):
-        self._scope = IOAScope()
-
-    # region Top level Python AST node types
-    def visit_Module(self, mod):
-        """ Visit parsed AST from ast.parse in 'exec' mode """
-        with IOAScopeHandler(self._scope, IOA.IOA_SPEC):
-            return self.visit_ioa_spec(mod)
-
-    def visit_Interactive(self, node):
-        """ Visit parsed AST from ast.parse in 'single' mode
-            This is can be used to test a single statement in eff
-        """
-        with IOAScopeHandler(self._scope, IOA.EFF):
-            return self.visit(node.body)
-
-    def visit_Expression(self, node):
-        """ Visit parsed AST from ast.parse in 'single' mode
-            This is can be used to test a single expression in eff
-        """
-        with IOAScopeHandler(self._scope, IOA.EFF):
-            return self.visit(node.body)
-
-    # endregion
-
+class DioneAstVisitor(DioAstVisitor, abc.ABC):
     # region Python statements
     def visit_AnnAssign(self, node):
         """ Variable annotated with type hints and followed by an optional assigned value. """
