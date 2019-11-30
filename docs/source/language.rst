@@ -36,3 +36,11 @@ Currently, we only support ``T`` to be a primitive type.
 
 
 
+Language Syntax
+---------------
+
+Dione language is a strict subset of Python 3.7 by design.
+We follow the `Abstract Grammar of Python 3.7`_ and describe the constraints over the abstract grammar for Dione.
+
+.. _Abstract Grammar of Python 3.7: https://docs.python.org/3.7/library/ast.html#abstract-grammar
+
