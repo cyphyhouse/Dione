@@ -2,7 +2,6 @@ import ast
 import symtable
 import unittest
 
-from dione.frontend.ioa_constructs import IOA, IOAScopeHandler
 from dione.frontend.translator_dafny import _IOANamespace, _ToDafnyVisitor
 
 _test_ioa = """
@@ -41,7 +40,8 @@ class Test_ToDafnyVisitor(unittest.TestCase):
     def test_visit_Quantifier(self):
         # Use eval mode to test expressions in an eff
         tree = ast.parse("forall([i, j], 0 <= i < j < len(arr))", mode='eval')
-        print(self._dfy_visitor.visit(tree))
+        self.assertEqual(self._dfy_visitor.visit(tree),
+                         "(forall i, j::(0<=i<j< |s.arr| ))")
 
 
 if __name__ == '__main__':
