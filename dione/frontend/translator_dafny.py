@@ -12,7 +12,7 @@ from dione.frontend.ioa_constructs import IOA
 class TranslatorDafny:
     def __init__(self, ioa_file: io.StringIO, k=0):
         if k < 0:
-            raise ValueError("Steps for invariant proof must be positive.")
+            raise ValueError("Steps for invariant proof must be non-negative.")
 
         self.__ioa_file = ioa_file
         self.__dfy_code = None
