@@ -6,9 +6,9 @@ SharedStatus: type = Enum[READY, BUSY, DONE]
 def system():
     class components:
         Robot : robot()
-        M0 : machine(0, 200, 210)
-        M1 : machine(1, 220, 234)
-        M2 : machine(2, 215, 219)
+        M0 : machine(0)
+        M1 : machine(1)
+        M2 : machine(2)
 
     invariant_of = implies((Robot.m0_status == READY), M0.status == M_IDLE) \
                 and implies((Robot.m1_status == READY), M1.status == M_IDLE) \
@@ -83,7 +83,7 @@ def robot():
 
 
 @automaton
-def machine(machine_id: Nat, t_min: int, t_max : int):
+def machine(machine_id: Nat):
     where = True
 
     class states:
