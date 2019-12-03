@@ -105,27 +105,27 @@ def machine(machine_id: Nat, t_min: int, t_max : int):
         def pick(i: Nat):
             where = (i == machine_id)
 
-class transitions:
-    @internal
-    @pre(True)
-    def m_selfloop(i):
-        pass
+    class transitions:
+        @internal
+        @pre(True)
+        def m_selfloop(i):
+            pass
 
-    @output
-    @pre(status == M_WORK)
-    def m_done(i):
-        status = M_DONE
+        @output
+        @pre(status == M_WORK)
+        def m_done(i):
+            status = M_DONE
 
-    @input
-    def drop(i):
-        if status == M_IDLE:
-            status = M_WORK
-        else:
-            status = M_BAD
+        @input
+        def drop(i):
+            if status == M_IDLE:
+                status = M_WORK
+            else:
+                status = M_BAD
 
-    @input
-    def pick(i):
-        if status == M_DONE:
-            status = M_IDLE
-        else:
-            status = M_BAD
+        @input
+        def pick(i):
+            if status == M_DONE:
+                status = M_IDLE
+            else:
+                status = M_BAD
