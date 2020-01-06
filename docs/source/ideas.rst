@@ -1,8 +1,53 @@
 Ideas
 =====
 
+Simplify Simulation for Parameterized Systems
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Technical Contributions
+-----------------------
+
++ Given traces from testing/simulation of large systems
+
+
+Theoretical Contributions
+-------------------------
+
+Apply existing small model properties to some classes of Safety/Liveness
+properties φ in a specification language, e.g., LTL or Signal Temporal Logic.
+
+Assume the system A(ṗ) takes parameters ṗ, we need to argue that model checking
+A(ṗ) ⊧ φ(ṗ) is equi-satisfiable in proving in First Order Logic.
+That is, for any assignment σ satisfies the symbolic representation Â(ṗ),
+σ also satisfies the FOL translation of φ.
+
+We restrict the interpretation of ṗ and σ within a (combined) SMT theory T
+where only equality over ṗ and linear order (special case of difference logic)
+for index of σ.
+Each alphabet can be a pair of a state and an action.
+
+
+Equivalently::
+
+    ∀ṗ∀σ. (Valid(ṗ) ∧ Traces(ṗ)(σ) ∧ Â(ṗ)(σ)) → φ(ṗ)(σ) is T-valid ⇔
+    Valid(ṗ) ∧ Traces(ṗ)(σ) ∧ Â(ṗ)(σ)) ∧ ¬φ(ṗ)(σ) is T-UNSAT
+
+We therefore need to inspect the body of Valid, Traces, Â, and φ to determine if
+the formula has finite model property.
+
+Given symbolic representation of initial states Θ and transition relation δ
+Â(ṗ) can be expanded as::
+
+    θ(ṗ)(σ[0].state) ∧ ∀i.δ(σ[i].state, σ[i+1].act, σ[i+1].state)
+
+Θ and δ cannot contain alternating quantifiers.
+
+
+
+
+
 Verification with Synchronizer models
--------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 + Provide two semantics for the same (restricted) IOA language
 
