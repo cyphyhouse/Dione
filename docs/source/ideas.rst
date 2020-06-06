@@ -1,6 +1,46 @@
 Ideas
 =====
 
+Realization of Execution Engines/Interpreters for (Timed) IOA
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Restricted Timed IOA class
+--------------------------
+
++ Non-deterministic behaviors only come from input actions (No internal non-determinism)
+
+  * Only one local action is enabled at a time.
+    Therefore, we can decide the action unless there is an input action.
+  * TODO Fairness?
+
+
+Different realizations
+----------------------
+
++ IOA object
+
+  * Change its state according to a given action.
+  * Similar to a Python Generator that can generate a possibly infinite sequence of states and actions
+
++ process IOA
+
+  * Thread
+  * Process
+
++ Channel IOA
+
+  * Thread shared variables, locks, etc.
+  * Pipe
+  * Network sockets
+
++ Composition
+
+  * New automaton objects from given automatons
+  * Multi-thread process
+  * Multi-processes on single machine
+  * Distributed System
+
+
 Simplify Simulation for Parameterized Systems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
