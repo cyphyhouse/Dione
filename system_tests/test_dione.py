@@ -1,11 +1,11 @@
 import ast
 
-from dione.frontend.ioa_ast_checker import IOAAstChecker
+from dione.frontend.dione_ast_checker import DioneAstChecker
 from dione.frontend.translator_dafny import TranslatorDafny
 
-with open("system_tests/ioa_examples/AsyncLCR.ioa.py") as file:
+with open("system_tests/ioa_examples/AsyncLCR_concrete.ioa.py") as file:
     tree = ast.parse(file.read())
-    IOAAstChecker().visit(tree)
+    # DioneAstChecker().visit(tree)  # TODO The implementation of DioneAstChecker is not finished
 
     file.seek(0)
     translator = TranslatorDafny(file)

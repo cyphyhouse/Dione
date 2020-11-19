@@ -1,5 +1,5 @@
 UID: type = Nat
-Status: type = Enum(UNKNOWN, CHOSEN, REPORTED)
+Status: type = Enum[UNKNOWN, CHOSEN, REPORTED]
 
 @composition
 def Sys(u0: UID, u1: UID, u2: UID):
@@ -53,6 +53,7 @@ def AsyncLCR0(u: UID):
 
 @automaton
 def AsyncLCR1(u: UID):
+    where = True
 
     class signature:
         @output
@@ -88,6 +89,7 @@ def AsyncLCR1(u: UID):
 
 @automaton
 def AsyncLCR2(u: UID):
+    where = True
 
     class signature:
         @output
