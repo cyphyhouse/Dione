@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import configparser
 import sys
+import time
 
 from dione.frontend.translator_dafny import TranslatorDafny
 from dione.verification_engine.prover_dafny import ProverDafny
@@ -14,6 +15,10 @@ async def run(options):
     #  translate IOA code concurrently?
     dfy_exe = options.dafny_server
     dfy_code = TranslatorDafny(options.ioa).get_dafny_code()
+    print("Translating Dafny Code:")
+    time.sleep(2.0)
+    print(dfy_code)
+    print("Verifying Dafny Code:")
     async with ProverDafny(dfy_exe) as prover:  # This creates a new process
         # TODO Specify pattern to prove invariant proof only
         print(await prover.verify(dfy_code, ["-proc:*proof_q*"]))
