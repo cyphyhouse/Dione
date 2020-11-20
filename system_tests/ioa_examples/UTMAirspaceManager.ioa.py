@@ -29,6 +29,8 @@ def AirspaceManager(N: nat):
         @input
         def request(i: UID, contr: Contract):
             reply_set = reply_set + {i}
+            if forall(j, implies(0 <= j < N and i != j, disjoint(contr, contr_arr[j]))):
+                contr_arr[i] = contr_arr[i] + contr
 
         @output
         @pre(i in reply_set and contr == contr_arr[i])
