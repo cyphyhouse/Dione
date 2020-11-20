@@ -45,6 +45,7 @@ class _IOANamespace:
                "Set": "set",
                "set": "set",
                "ISet": "iset",
+               "iset": "iset",
                "Mset": "multiset",
                # Python typing module
                "Sequence": "seq",
@@ -1025,9 +1026,16 @@ class _ToDafnyVisitor(DioneAstVisitor):
             if call.func.id == "set":
                 assert len(call.args) == 0, "Only support empty set for now"
                 return " {} "
+            if call.func.id == "iset":
+                assert len(call.args) == 0, "Only support empty iset for now"
+                return " iset{} "
             if call.func.id == "implies":
                 assert len(call.args) == 2
                 return "(" + self.visit(call.args[0]) + " ==> " + \
+                       self.visit(call.args[1]) + ")"
+            if call.func.id == "disjoint":
+                assert len(call.args) == 2
+                return "(" + self.visit(call.args[0]) + " !! " + \
                        self.visit(call.args[1]) + ")"
             if call.func.id in ["forall", "exists"]:
                 assert len(call.args) == 2
