@@ -43,6 +43,8 @@ class _IOANamespace:
                "Seq": "seq",
                "Map": "map",
                "Set": "set",
+               "set": "set",
+               "ISet": "iset",
                "Mset": "multiset",
                # Python typing module
                "Sequence": "seq",
@@ -358,8 +360,8 @@ class _ToDafnyVisitor(DioneAstVisitor):
     def visit_Dict(self, exp):
         raise NotImplementedError("Dictionary expression is not supported yet")
 
-    def visit_Set(self, exp):
-        raise NotImplementedError("Finite set expression is not supported yet")
+    def visit_Set(self, exp: ast.Set) -> str:
+        return '{' + ','.join(self.visit(e) for e in exp.elts) + '}'
 
     def visit_ListComp(self, exp: ast.ListComp) -> str:
         # FIXME maybe we can visit generators
@@ -706,6 +708,9 @@ class _ToDafnyVisitor(DioneAstVisitor):
         elif cons == 'NamedTuple':
             arg_list = self.visit(typ.slice)
             shorthand = "datatype " + name + " = " + name + "(" + arg_list + ")"
+        elif cons in ['seq', 'set', 'iset']:
+            para_typ = self.visit(typ.slice.value)
+            shorthand = "type " + name + " = " + cons + '<' + para_typ + '>'
         else:
             raise ValueError("Unexpected shorthand type constructor \"" + cons + "\"")
 
@@ -1017,6 +1022,9 @@ class _ToDafnyVisitor(DioneAstVisitor):
             if call.func.id == "len":
                 assert len(call.args) == 1
                 return " |" + self.visit(call.args[0]) + "| "
+            if call.func.id == "set":
+                assert len(call.args) == 0, "Only support empty set for now"
+                return " {} "
             if call.func.id == "implies":
                 assert len(call.args) == 2
                 return "(" + self.visit(call.args[0]) + " ==> " + \
